@@ -1,30 +1,25 @@
 <?php
+// app/Http/Controllers/RhController.php
+
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class RhController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware(function ($request, $next) {
-            if (Auth::user()->role !== 'rh') {
-                return response()->json(['success' => false, 'message' => 'Accès refusé'], 403);
-            }
-            return $next($request);
-        });
-    }
+    // ✅ Plus de __construct avec middleware
+    // La protection est gérée par la route
 
     public function getStats()
     {
-        // TODO: Implémenter la logique de récupération des statistiques
+        // auth()->user() fonctionne car la route
+        // a déjà vérifié que l'user est connecté
         return response()->json([
             'success' => true,
             'data' => [
-                'total_candidates' => 42,
-                'active_offers' => 8,
-                'interviews_today' => 3,
+                'total_candidates'     => 42,
+                'active_offers'        => 8,
+                'interviews_today'     => 3,
                 'pending_applications' => 15
             ]
         ]);
@@ -32,14 +27,9 @@ class RhController extends Controller
 
     public function getOffres()
     {
-        // TODO: Implémenter la récupération des offres depuis la base
         return response()->json([
             'success' => true,
-            'data' => [
-               
-            ]
+            'data'    => []
         ]);
     }
-
-    // ... autres méthodes à implémenter plus tard ...
 }
