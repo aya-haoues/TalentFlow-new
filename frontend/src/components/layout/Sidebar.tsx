@@ -27,12 +27,43 @@ interface SidebarProps {
   onCollapse: (collapsed: boolean) => void;
 }
 
+// 📋 Menu latéral RH - CORRECTION DU LIEN "Offres"
 const sidebarItems: MenuItem[] = [
-  { key: 'dashboard', label: 'Tableau de bord', icon: <DashboardOutlined />, path: '/dashboard/rh' },
-  { key: 'jobs', label: 'Offres d\'emploi', icon: <FileTextOutlined />, path: '/jobs' },
-  { key: 'applications', label: 'Candidatures', icon: <UsergroupAddOutlined />, path: '/candidates' }, // ← Changé ici
-  { key: 'departments', label: 'Départements', icon: <TeamOutlined />, path: '/departments' },
-  { key: 'settings', label: 'Paramètres', icon: <SettingOutlined />, path: '/settings' },
+  { 
+    key: 'dashboard', 
+    label: 'Tableau de bord', 
+    icon: <DashboardOutlined />, 
+    path: '/dashboard/rh', 
+    description: 'Vue d\'ensemble' 
+  },
+  { 
+    key: 'jobs', 
+    label: 'Offres', 
+    icon: <FileTextOutlined />, 
+    path: '/rh/jobs',  // ✅ CORRECTION : /rh/jobs au lieu de /jobs
+    description: 'Gérer les offres'  // ✅ Description mise à jour
+  },
+  { 
+    key: 'applications', 
+    label: 'Candidatures', 
+    icon: <UsergroupAddOutlined />, 
+    path: '/rh/applications',  // ✅ Aussi corriger si nécessaire
+    description: 'Gérer candidats' 
+  },
+  { 
+    key: 'departments', 
+    label: 'Départements', 
+    icon: <TeamOutlined />, 
+    path: '/rh/departments',  // ✅ Aussi corriger si nécessaire
+    description: 'Organisation' 
+  },
+  { 
+    key: 'settings', 
+    label: 'Paramètres', 
+    icon: <SettingOutlined />, 
+    path: '/rh/settings',  // ✅ Aussi corriger si nécessaire
+    description: 'Configuration' 
+  },
 ];
 
 export default function Sidebar({ collapsed, onCollapse }: SidebarProps) {

@@ -7,21 +7,21 @@ import {
 } from 'antd';
 import {
   FileTextOutlined, UsergroupAddOutlined, ScheduleOutlined,
-  PlusOutlined, ArrowRightOutlined, CheckCircleOutlined,
-  ClockCircleOutlined, CloseCircleOutlined, TeamOutlined,
+  ArrowRightOutlined, CheckCircleOutlined,
+  ClockCircleOutlined, CloseCircleOutlined, 
   InboxOutlined, UserOutlined, VideoCameraOutlined,
   MailOutlined, ThunderboltOutlined, RobotOutlined,
   FireOutlined, BarChartOutlined, EyeOutlined,
   CopyOutlined, DeleteOutlined, InfoCircleOutlined, CloseOutlined
 } from '@ant-design/icons';
-import { authService } from '../services/api';
-import RhLayout from '../components/layout/RhLayout';
+import { authService } from '../../services/api';
+import RhLayout from '../../components/layout/RhLayout';
 
 // Exemples de chemins possibles :
-import type { User } from '../types/index';     // Si types est un dossier
+import type { User } from '../../types/index';     // Si types est un dossier
 
 
-const { Title, Text, Paragraph } = Typography;
+const {Text} = Typography;
 
 // 📋 Données simulées (à remplacer par des appels API réels)
 const pipelineStages = [
@@ -274,7 +274,7 @@ export default function RhDashboard() {
           <Card
             title={<Space><FileTextOutlined /><span>Offres récentes</span></Space>}
             bordered={false}
-            extra={<Link to="/jobs">Gérer les offres <ArrowRightOutlined /></Link>}
+            extra={<Link to="/rh/jobs">Gérer les offres <ArrowRightOutlined /></Link>}
           >
             <List
               itemLayout="horizontal"

@@ -10,7 +10,6 @@ import { BellOutlined, UserOutlined, DownOutlined, LogoutOutlined, SettingOutlin
 import { authService } from '../../services/api';
 import type { User } from '../../types';
 import Sidebar from './Sidebar';  // ✅ Import du composant Sidebar
-import Header from './Header';     // ✅ Import du composant Header (si tu l'as créé)
 
 const { Content } = Layout;
 const { Text } = Typography;
@@ -24,9 +23,9 @@ interface RhLayoutProps {
 
 export default function RhLayout({ title, description, actions, children }: RhLayoutProps) {
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(authService.getCurrentUser());
+  const [user] = useState<User | null>(authService.getCurrentUser());
   const [collapsed, setCollapsed] = useState(false);
-  const [notificationsCount, setNotificationsCount] = useState(3); // 🔴 À dynamiser
+  const [notificationsCount] = useState(3); // 🔴 À dynamiser
 
   const { token } = theme.useToken();
   const primaryColor = token.colorPrimary ?? '#00a89c';

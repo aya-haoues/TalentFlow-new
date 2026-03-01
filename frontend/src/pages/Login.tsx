@@ -15,9 +15,11 @@ const Login: React.FC = () => {
   const [pageTitle, setPageTitle] = useState('Connexion Candidat');
   const [registerPath, setRegisterPath] = useState('/register');
   const [registerLabel, setRegisterLabel] = useState('Créer un compte candidat');
+  
+  // Récupérer l'URL de retour (par défaut dashboard candidat)
+  const from = location.state?.from || '/dashboard';
 
   useEffect(() => {
-    // 🔑 DÉTERMINATION PRÉCISE DU TYPE DE LOGIN ET LIENS D'INSCRIPTION
     if (location.pathname === '/login/rh') {
       setLoginType('rh');
       setPageTitle('Connexion Responsable RH');
@@ -36,32 +38,59 @@ const Login: React.FC = () => {
     }
   }, [location]);
 
-  const onFinish = async (values: LoginFormData) => {
-    setLoading(true);
-    try {
-      // 🔑 PASSER LE TYPE AU SERVICE (même méthode login backend pour tous)
-      const response = await authService.login(values, loginType === 'candidat' ? 'default' : loginType);
+  // ✅ Correction : onFinish avec typage propre
+const onFinish = async (values: LoginFormData) => {
+  setLoading(true);
+  
+  try {
+    // ✅ 1. Appel à authService avec typage explicite
+    const response = await authService.login(
+      values, 
+      loginType === 'candidat' ? 'default' : loginType
+    );
+    
+    // ✅ 2. Vérification type-safe de la réponse
+    if (response?.access_token) {
       message.success('Connexion réussie !');
       
-      // Redirection selon rôle stocké en base
-      if (response.redirect_url) {
-        navigate(response.redirect_url);
+      // ✅ 3. Récupérer l'utilisateur depuis le service (déjà typé)
+      const user = authService.getCurrentUser();
+      
+      // ✅ 4. Redirection selon le rôle (type guard)
+      if (user?.role === 'rh') {
+        navigate('/dashboard/rh', { replace: true });
+      } else if (user?.role === 'manager') {
+        navigate('/dashboard/manager', { replace: true });
       } else {
-        navigate('/dashboard/rh');
-       
+        // Candidat ou fallback
+        navigate(from, { replace: true });
       }
-    } catch (error: any) {
-      if (error.response?.status === 401) {
+    }
+    
+  } catch (error: unknown) {  // ✅ Remplacer 'any' par 'unknown'
+    
+    // ✅ Type guard pour accéder aux propriétés de l'erreur
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response?: { status?: number; data?: { message?: string } } };
+      
+      if (axiosError.response?.status === 401) {
         message.error('Email ou mot de passe incorrect');
-      } else if (error.response?.data?.message) {
-        message.error(error.response.data.message);
+      } else if (axiosError.response?.data?.message) {
+        message.error(axiosError.response.data.message);
       } else {
         message.error('Erreur lors de la connexion');
       }
-    } finally {
-      setLoading(false);
+    } else if (error instanceof Error) {
+      // ✅ Fallback pour erreurs natives JavaScript
+      message.error(error.message || 'Erreur lors de la connexion');
+    } else {
+      message.error('Une erreur inattendue est survenue');
     }
-  };
+    
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div style={{ 
@@ -140,7 +169,6 @@ const Login: React.FC = () => {
           </Form.Item>
         </Form>
 
-        {/* 🔑 SECTION INSCRIPTION CLAIRE ET SÉPARÉE PAR RÔLE */}
         <div style={{ 
           textAlign: 'center', 
           marginTop: '2rem', 
@@ -163,8 +191,6 @@ const Login: React.FC = () => {
           >
             → S'inscrire maintenant
           </Link>
-          
-          
         </div>
       </Card>
     </div>

@@ -54,4 +54,72 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
+
+
+
+
+
+
+// ✅ Liste des offres publiées (visible par tous)
+Route::get('/jobs', function () {
+    $jobs = \App\Models\Job::with(['department'])
+        ->where('statut', 'publiee')
+        ->latest()
+        ->get();
     
+    return response()->json([
+        'success' => true,
+        'data' => $jobs
+    ]);
+});
+
+// ✅ Détail d'une offre (visible par tous)
+Route::get('/jobs/{id}', function ($id) {
+    $job = \App\Models\Job::with(['department'])
+        ->where('id', $id)
+        ->where('statut', 'publiee')
+        ->first();
+    
+    if (!$job) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Offre non trouvée'
+        ], 404);
+    }
+    
+    return response()->json([
+        'success' => true,
+        'data' => $job
+    ]);
+});
+
+// ✅ Soumettre une candidature (nécessite authentification candidat)
+/*Route::middleware('auth:sanctum')->post('/applications', function (\Illuminate\Http\Request $request) {
+    $validated = $request->validate([
+        'job_id' => 'required|exists:jobs,id',
+        'message' => 'required|string|min:50',
+        'cv_path' => 'nullable|string',
+    ]);
+    
+    $application = \App\Models\Application::create([
+        'job_id' => $validated['job_id'],
+        'candidate_id' => auth()->id(),
+        'message' => $validated['message'],
+        'cv_path' => $validated['cv_path'] ?? null,
+        'statut' => 'en_attente',
+    ]);
+    
+    return response()->json([
+        'success' => true,
+        'message' => 'Candidature envoyée',
+        'data' => $application
+    ], 201);
+});*/
+
+
+
+
+
+
+
+

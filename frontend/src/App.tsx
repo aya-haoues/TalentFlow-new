@@ -1,43 +1,55 @@
-// src/App.tsx
-import React from "react";
+// src/App.tsx - VERSION CORRIGÉE (sans double layout)
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import 'antd/dist/reset.css'; // ou 'antd/dist/antd.css' selon votre version
 import { ConfigProvider } from 'antd';
 import frFR from 'antd/locale/fr_FR';
 
+// 🎨 Layouts
+import Navbar from "./components/layout/Navbar";
+
 // 📄 Pages Publiques
 import Home from "./pages/Home";
+import JobsPage from "./pages/JobsPage";
+import JobDetailPage from "./pages/JobDetailPage";
 import Login from "./pages/Login";
 import RegisterCandidat from "./pages/RegisterCandidat";
 import RegisterRh from "./pages/RegisterRh";
 import RegisterManager from "./pages/RegisterManager";
-import CandidatesPage from './pages/CandidatesPage';
 
-// 📄 Pages RH (Protégées)
-import RhDashboard from "./pages/RhDashboard";
-import JobsPage from './pages/JobsPage';
+// 📄 Pages RH (dans dossier rh/)
+import RhDashboard from "./pages/rh/RhDashboard";
+import RhJobsPage from "./pages/rh/RhJobsPage";
+import CandidatesPage from "./pages/rh/CandidatesPage";
 
-// 🔐 Service d'authentification (directement depuis services/)
+import ApplyJobPage from './pages/ApplyJobPage';
+
+// 🔐 Auth service
 import { authService } from "./services/api";
 import type { User } from "./types";
 
-// 🛡️ Composant pour protéger les routes RH
+// 🛡️ Protection routes RH
 function RhRoute({ children }: { children: React.ReactNode }) {
-  // ✅ Vérification directe avec authService
   const user: User | null = authService.getCurrentUser();
   const isAuthenticated = authService.isAuthenticated();
   
-  // Si non connecté → redirect login
   if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;
   }
-  
-  // Si connecté mais pas RH → redirect home
   if (user.role !== 'rh') {
     return <Navigate to="/" replace />;
   }
+  return <>{children}</>;
+}
+
+// Fonction de protection pour les candidats (ou tout utilisateur connecté)
+function CandidateRoute({ children }: { children: React.ReactNode }) {
+  const user: User | null = authService.getCurrentUser();
+  const isAuthenticated = authService.isAuthenticated();
   
-  // ✅ Accès autorisé
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" replace />;
+  }
+  // Si vous voulez restreindre aux seuls candidats :
+  // if (user.role !== 'candidat') return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -47,68 +59,86 @@ const App: React.FC = () => {
       locale={frFR}
       theme={{
         token: {
-          colorPrimary: '#00a89c', // Orangé
+          colorPrimary: '#00a89c',
+          borderRadius: 8,
         },
       }}
     >
+      <Router>
+        <Routes>
+          
+          {/* ============================================
+              🌍 ROUTES PUBLIQUES (sans auth)
+              ============================================ */}
+          
+          <Route path="/" element={
+            <>
+              <Navbar />
+              <Home />
+            </>
+          } />
+          
+          <Route path="/jobs" element={
+            <>
+              <Navbar />
+              <JobsPage />
+            </>
+          } />
+          
+          <Route path="/jobs/:id" element={
+            <>
+              <Navbar />
+              <JobDetailPage />
+            </>
+          } />
 
-    <Router>
-      <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-        
-        <main style={{ flex: 1 }}>
-          <Routes>
-            {/* 🌍 ROUTES PUBLIQUES */}
-            <Route path="/" element={<Home />} />
-            
-            {/* 🔐 AUTHENTIFICATION */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/login/rh" element={<Login />} />
-            <Route path="/login/manager" element={<Login />} />
-            
-            {/* 📝 INSCRIPTIONS */}
-            <Route path="/register" element={<RegisterCandidat />} />
-            <Route path="/register/rh" element={<RegisterRh />} />
-            <Route path="/register/manager" element={<RegisterManager />} />
-            
-            {/* 👔 ROUTES RH (Protégées) */}
-            <Route 
-              path="/dashboard/rh" 
-              element={
-                <RhRoute>
-                  <RhDashboard />
-                </RhRoute>
-              } 
-            />
-            
-            {/* 🎯 GESTION DES OFFRES */}
-            <Route 
-              path="/jobs" 
-              element={
-                <RhRoute>
-                  <JobsPage />
-                </RhRoute>
-              } 
-            />
-            
-            {/* ✅ Pages RH avec layout partagé */}
-        <Route path="/dashboard/rh" element={<RhDashboard />} />
-        <Route path="/jobs" element={<JobsPage />} />
+          <Route path="/jobs/:id/apply" element={<CandidateRoute><ApplyJobPage /></CandidateRoute>} />
 
-<Route path="/candidates" element={<CandidatesPage />} />
-
-            {/* 🔄 REDIRECTIONS */}
-        <Route path="/" element={<Navigate to="/dashboard/rh" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard/rh" replace />} />
-          </Routes>
-        </main>
-      </div>
-    </Router>
-
-        </ConfigProvider>
-
+          
+          <Route path="/about" element={
+            <>
+              <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
+                <h1>À propos de TalentFlow</h1>
+              </div>
+            </>
+          } />
+          
+          {/* 🔐 AUTHENTIFICATION */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/login/rh" element={<Login />} />
+          <Route path="/login/manager" element={<Login />} />
+          
+          {/* 📝 INSCRIPTIONS */}
+          <Route path="/register" element={<RegisterCandidat />} />
+          <Route path="/register/rh" element={<RegisterRh />} />
+          <Route path="/register/manager" element={<RegisterManager />} />
+          
+          {/* ============================================
+              👔 ROUTES RH (protégées)
+              ============================================ */}
+          
+          <Route path="/dashboard/rh" element={
+            <RhRoute>
+              <RhDashboard />  {/* ← plus de wrapper RhLayout ici */}
+            </RhRoute>
+          } />
+          
+          <Route path="/rh/jobs" element={
+            <RhRoute>
+              <RhJobsPage />   {/* ← plus de wrapper RhLayout ici */}
+            </RhRoute>
+          } />
+          
+          <Route path="/rh/candidates" element={
+            <RhRoute>
+              <CandidatesPage />  {/* ← plus de wrapper RhLayout ici */}
+            </RhRoute>
+          } />
+          
+        </Routes>
+      </Router>
+    </ConfigProvider>
   );
 };
-
-
 
 export default App;

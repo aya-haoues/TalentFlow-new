@@ -4,12 +4,12 @@ import {
   Card, List, Tag, Space, Typography, Input, Button, Select, Row, Col, Statistic, Avatar, message
 } from 'antd';
 import {
-  SearchOutlined, UserOutlined, FileTextOutlined, CheckCircleOutlined,
+  UserOutlined, FileTextOutlined, CheckCircleOutlined,
   ClockCircleOutlined, CloseCircleOutlined, EyeOutlined
 } from '@ant-design/icons';
-import RhLayout from '../components/layout/RhLayout';
+import RhLayout from '../../components/layout/RhLayout';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { Option } = Select;
 
 // Types
