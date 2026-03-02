@@ -1,7 +1,12 @@
-// src/App.tsx - VERSION CORRIGÉE (sans double layout)
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { ConfigProvider } from 'antd';
-import frFR from 'antd/locale/fr_FR';
+import React from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { ConfigProvider } from "antd";
+import frFR from "antd/locale/fr_FR";
 
 // 🎨 Layouts
 import Navbar from "./components/layout/Navbar";
@@ -14,42 +19,42 @@ import Login from "./pages/Login";
 import RegisterCandidat from "./pages/RegisterCandidat";
 import RegisterRh from "./pages/RegisterRh";
 import RegisterManager from "./pages/RegisterManager";
+import SocialCallback from "./pages/SocialCallback";
+import About from "./pages/About";
 
-// 📄 Pages RH (dans dossier rh/)
+// 📄 Pages RH
 import RhDashboard from "./pages/rh/RhDashboard";
 import RhJobsPage from "./pages/rh/RhJobsPage";
 import CandidatesPage from "./pages/rh/CandidatesPage";
 
-import ApplyJobPage from './pages/ApplyJobPage';
+// 📄 Pages Candidat
+import CandidatDashboard from "./pages/candidat/CandidatDashboard";
+
+import ApplyJobPage from "./pages/candidat/ApplyJobPage";
 
 // 🔐 Auth service
 import { authService } from "./services/api";
 import type { User } from "./types";
 
-// 🛡️ Protection routes RH
+/**
+ * 🛡️ Guard : Protège les routes RH
+ */
 function RhRoute({ children }: { children: React.ReactNode }) {
-  const user: User | null = authService.getCurrentUser();
-  const isAuthenticated = authService.isAuthenticated();
-  
-  if (!isAuthenticated || !user) {
+  const user = authService.getCurrentUser();
+  if (!authService.isAuthenticated() || user?.role !== "rh") {
     return <Navigate to="/login" replace />;
-  }
-  if (user.role !== 'rh') {
-    return <Navigate to="/" replace />;
   }
   return <>{children}</>;
 }
 
-// Fonction de protection pour les candidats (ou tout utilisateur connecté)
+/**
+ * 🛡️ Guard : Protège les routes Candidat
+ */
 function CandidateRoute({ children }: { children: React.ReactNode }) {
-  const user: User | null = authService.getCurrentUser();
-  const isAuthenticated = authService.isAuthenticated();
-  
-  if (!isAuthenticated || !user) {
+  const user = authService.getCurrentUser();
+  if (!authService.isAuthenticated() || user?.role !== "candidat") {
     return <Navigate to="/login" replace />;
   }
-  // Si vous voulez restreindre aux seuls candidats :
-  // if (user.role !== 'candidat') return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -59,82 +64,97 @@ const App: React.FC = () => {
       locale={frFR}
       theme={{
         token: {
-          colorPrimary: '#00a89c',
+          colorPrimary: "#00a89c",
           borderRadius: 8,
         },
       }}
     >
       <Router>
         <Routes>
-          
-          {/* ============================================
-              🌍 ROUTES PUBLIQUES (sans auth)
-              ============================================ */}
-          
-          <Route path="/" element={
-            <>
-              <Navbar />
-              <Home />
-            </>
-          } />
-          
-          <Route path="/jobs" element={
-            <>
-              <Navbar />
-              <JobsPage />
-            </>
-          } />
-          
-          <Route path="/jobs/:id" element={
-            <>
-              <Navbar />
-              <JobDetailPage />
-            </>
-          } />
+          {/* 🌍 ROUTES PUBLIQUES */}
+          <Route
+            path="/"
+            element={
+              <>
+                <Navbar />
+                <Home />
+              </>
+            }
+          />
+          <Route
+            path="/jobs"
+            element={
+              <>
+                <Navbar />
+                <JobsPage />
+              </>
+            }
+          />
+          <Route
+            path="/jobs/:id"
+            element={
+              <>
+                <Navbar />
+                <JobDetailPage />
+              </>
+            }
+          />
+          <Route path="/social/callback" element={<SocialCallback />} />
 
-          <Route path="/jobs/:id/apply" element={<CandidateRoute><ApplyJobPage /></CandidateRoute>} />
-
-          
-          <Route path="/about" element={
-            <>
-              <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
-                <h1>À propos de TalentFlow</h1>
-              </div>
-            </>
-          } />
-          
-          {/* 🔐 AUTHENTIFICATION */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/login/rh" element={<Login />} />
-          <Route path="/login/manager" element={<Login />} />
-          
-          {/* 📝 INSCRIPTIONS */}
+          {/* 🔐 AUTH & INSCRIPTION */}
+          <Route path="/login/:role?" element={<Login />} />
           <Route path="/register" element={<RegisterCandidat />} />
           <Route path="/register/rh" element={<RegisterRh />} />
           <Route path="/register/manager" element={<RegisterManager />} />
-          
-          {/* ============================================
-              👔 ROUTES RH (protégées)
-              ============================================ */}
-          
-          <Route path="/dashboard/rh" element={
-            <RhRoute>
-              <RhDashboard />  {/* ← plus de wrapper RhLayout ici */}
-            </RhRoute>
-          } />
-          
-          <Route path="/rh/jobs" element={
-            <RhRoute>
-              <RhJobsPage />   {/* ← plus de wrapper RhLayout ici */}
-            </RhRoute>
-          } />
-          
-          <Route path="/rh/candidates" element={
-            <RhRoute>
-              <CandidatesPage />  {/* ← plus de wrapper RhLayout ici */}
-            </RhRoute>
-          } />
-          
+
+          {/* 👤 ROUTES CANDIDAT (Protégées) */}
+          <Route path="/candidat/dashboard" element={<CandidatDashboard />} />
+          <Route
+            path="/candidat/applications"
+            element={
+              <CandidateRoute>
+                <ApplyJobPage />
+              </CandidateRoute>
+            }
+          />
+          <Route
+            path="/jobs/:id/apply"
+            element={
+              <CandidateRoute>
+                <ApplyJobPage />
+              </CandidateRoute>
+            }
+          />
+
+          {/* 👔 ROUTES RH (Protégées) */}
+          <Route
+            path="/dashboard/rh"
+            element={
+              <RhRoute>
+                <RhDashboard />
+              </RhRoute>
+            }
+          />
+          <Route
+            path="/rh/jobs"
+            element={
+              <RhRoute>
+                <RhJobsPage />
+              </RhRoute>
+            }
+          />
+          <Route
+            path="/rh/candidates"
+            element={
+              <RhRoute>
+                <CandidatesPage />
+              </RhRoute>
+            }
+          />
+          <Route path="/about" element={<About />} />
+
+          {/* Redirection par défaut si route inconnue */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
     </ConfigProvider>

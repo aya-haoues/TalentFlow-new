@@ -1,189 +1,253 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
+use Laravel\Socialite\Facades\Socialite;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 
 class AuthController extends Controller
 {
-    // ✅ INSCRIPTION CANDIDAT : Publique, sans rôle à choisir
+    /**
+     *  INSCRIPTION CANDIDAT (Avec détection de compte Social existant)
+     */
     public function registerCandidat(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'min:2', 'max:100', 'regex:/^[a-zA-Zàâçéèêëîïôûùüÿñæœ\s]+$/u'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'], // Le 'unique' bloque ici
             'password' => ['required', 'string', 'min:8', 'confirmed', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/[0-9]/'],
             'telephone' => ['nullable', 'string', 'regex:/^(\+216|00216|0)?[23456789]\d{7}$/'],
-            'linkedin_url' => ['nullable', 'url', 'regex:/^(https?:\/\/)?(www\.)?linkedin\.com\/in\/[a-zA-Z0-9\-_]{5,30}\/?$/'],
+            'linkedin_url' => ['nullable', 'url'],
         ], $this->validationMessages());
 
         if ($validator->fails()) {
-            return response()->json(['success' => false, 'message' => 'Validation échouée', 'errors' => $validator->errors()], 422);
+            // 🔍 LOGIQUE PERSONNALISÉE : Vérifier si l'email existe déjà via un login Social
+            $existingUser = User::where('email', $request->email)->first();
+
+            if ($existingUser && $existingUser->social_provider) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => [
+                        'email' => ["Cet email est lié à un compte " . ucfirst($existingUser->social_provider) . ". Veuillez vous connecter via ce service."]
+                    ]
+                ], 422);
+            }
+
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
+        // Si la validation passe, on crée l'utilisateur
         $user = User::create([
             'name' => trim($request->name),
             'email' => strtolower(trim($request->email)),
             'password' => Hash::make($request->password),
-            'role' => 'candidat', // 🔑 RÔLE FIXE
+            'role' => 'candidat',
             'telephone' => $request->telephone,
             'linkedin_url' => $request->linkedin_url,
-            'departement' => null,
         ]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Inscription réussie ! Bienvenue sur Recrutech',
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user' => $user->only(['id', 'name', 'email', 'role', 'telephone', 'linkedin_url'])
-        ], 201);
+        return $this->respondWithToken($user, 'Inscription réussie !');
     }
-
-    // ✅ INSCRIPTION RH : Département obligatoire + validation métier
+    /**
+     *  INSCRIPTION RH
+     */
     public function registerRh(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'name' => ['required', 'string', 'min:2', 'max:100', 'regex:/^[a-zA-Zàâçéèêëîïôûùüÿñæœ\s]+$/u'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'string', 'min:8', 'confirmed', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/[0-9]/'],
-            'telephone' => ['required', 'string', 'regex:/^(\+216|00216|0)?[23456789]\d{7}$/'],
-            'departement' => ['required', 'string', 'max:100', 'in:IT,Ventes,Marketing,RH,Finance,Production,Logistique'],
+            'name' => ['required', 'string', 'min:2', 'max:100'],
+            'email' => ['required', 'string', 'email', 'unique:users'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'telephone' => ['required', 'string'],
+            'departement' => ['required', 'string'],
         ], $this->validationMessages());
 
         if ($validator->fails()) {
-            return response()->json(['success' => false, 'message' => 'Validation échouée', 'errors' => $validator->errors()], 422);
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
         $user = User::create([
             'name' => trim($request->name),
             'email' => strtolower(trim($request->email)),
             'password' => Hash::make($request->password),
-            'role' => 'rh', // 🔑 RÔLE FIXE RH
+            'role' => 'rh',
             'telephone' => $request->telephone,
-            'linkedin_url' => null,
             'departement' => $request->departement,
         ]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Inscription RH réussie ! Votre compte est en attente d\'approbation.',
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user' => $user->only(['id', 'name', 'email', 'role', 'telephone', 'departement'])
-        ], 201);
+        return $this->respondWithToken($user, 'Compte RH créé.');
     }
 
-    // ✅ INSCRIPTION MANAGER : Département + position obligatoires
-    public function registerManager(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'name' => ['required', 'string', 'min:2', 'max:100', 'regex:/^[a-zA-Zàâçéèêëîïôûùüÿñæœ\s]+$/u'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'string', 'min:8', 'confirmed', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/[0-9]/'],
-            'telephone' => ['required', 'string', 'regex:/^(\+216|00216|0)?[23456789]\d{7}$/'],
-            'departement' => ['required', 'string', 'max:100', 'in:IT,Ventes,Marketing,RH,Finance,Production,Logistique'],
-            'position' => ['required', 'string', 'max:100', 'in:Chef de département,Directeur,Responsable d\'équipe'],
-        ], $this->validationMessages());
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'message' => 'Validation échouée', 'errors' => $validator->errors()], 422);
-        }
-
-        $user = User::create([
-            'name' => trim($request->name),
-            'email' => strtolower(trim($request->email)),
-            'password' => Hash::make($request->password),
-            'role' => 'manager', // 🔑 RÔLE FIXE MANAGER
-            'telephone' => $request->telephone,
-            'linkedin_url' => null,
-            'departement' => $request->departement,
-        ]);
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Inscription Manager réussie ! Votre compte est en attente d\'approbation.',
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user' => $user->only(['id', 'name', 'email', 'role', 'telephone', 'departement'])
-        ], 201);
-    }
-
-    // ✅ LOGIN UNIQUE (fonctionne pour tous les rôles)
+    /**
+     *  LOGIN UNIFIÉ
+     */
     public function login(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'email' => ['required', 'string', 'email', 'max:255'],
-            'password' => ['required', 'string', 'min:8'],
-        ], [
-            'email.required' => 'Email obligatoire',
-            'email.email' => 'Format invalide',
-            'password.required' => 'Mot de passe obligatoire',
-            'password.min' => '8 caractères minimum',
-        ]);
+        $credentials = $request->only('email', 'password');
 
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'message' => 'Validation échouée', 'errors' => $validator->errors()], 422);
-        }
-
-        $user = User::where('email', strtolower(trim($request->email)))->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (!Auth::attempt($credentials)) {
             return response()->json(['success' => false, 'message' => 'Email ou mot de passe incorrect'], 401);
         }
 
-        // 🔑 REDIRECTION SELON RÔLE STOCKÉ
-        $redirectUrl = '/';
-        if ($user->role === 'rh') $redirectUrl = '/dashboard/rh';
-        elseif ($user->role === 'manager') $redirectUrl = '/dashboard/manager';
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Connexion réussie',
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user' => $user->only(['id', 'name', 'email', 'role', 'telephone', 'departement', 'linkedin_url']),
-            'redirect_url' => $redirectUrl
-        ]);
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        return $this->respondWithToken($user, 'Connexion réussie');
     }
 
+    /**
+     *  MÉTHODES SOCIALES (GOOGLE)
+     */
+    public function redirectToGoogle()
+    {
+        /** @var \Laravel\Socialite\Two\AbstractProvider $driver */
+        $driver = Socialite::driver('google');
+        return $driver->stateless()->redirect();
+    }
+
+    public function handleGoogleCallback()
+    {
+        try {
+            /** @var \Laravel\Socialite\Two\AbstractProvider $driver */
+            $driver = Socialite::driver('google');
+            $socialUser = $driver->stateless()->user();
+
+            return $this->handleSocialLogin($socialUser, 'google');
+        } catch (\Exception $e) {
+            Log::error('Google Auth Error: ' . $e->getMessage());
+            return redirect('http://localhost:5173/login?error=google_failed');
+        }
+    }
+
+    /**
+     * 🔑 MÉTHODES SOCIALES (LINKEDIN - OpenID Connect)
+     */
+    public function redirectToLinkedIn()
+    {
+        /** @var \Laravel\Socialite\Two\AbstractProvider $driver */
+        $driver = Socialite::driver('linkedin');
+
+        return $driver->scopes(['openid', 'profile', 'email'])
+            ->stateless()
+            ->redirect();
+    }
+
+    public function handleLinkedInCallback(Request $request)
+    {
+        $code = $request->query('code');
+
+        if (!$code) {
+            return redirect('http://localhost:5173/login?error=no_code_provided');
+        }
+
+        try {
+            // Échange du code contre Token via HTTP Client
+            $tokenResponse = Http::asForm()->post('https://www.linkedin.com/oauth/v2/accessToken', [
+                'grant_type'    => 'authorization_code',
+                'code'          => $code,
+                'redirect_uri'  => config('services.linkedin.redirect'),
+                'client_id'     => config('services.linkedin.client_id'),
+                'client_secret' => config('services.linkedin.client_secret'),
+            ]);
+
+            if ($tokenResponse->failed()) throw new \Exception("LinkedIn Token Failed");
+
+            $accessToken = $tokenResponse->json()['access_token'];
+
+            // Récupération Profil via OpenID
+            $userResponse = Http::withToken($accessToken)->get('https://api.linkedin.com/v2/userinfo');
+            $userData = $userResponse->json();
+
+            // Objet standard pour le login
+            $socialUser = new \stdClass();
+            $socialUser->id = $userData['sub'];
+            $socialUser->name = $userData['name'];
+            $socialUser->email = $userData['email'];
+            $socialUser->avatar = $userData['picture'] ?? null;
+
+            return $this->handleSocialLogin($socialUser, 'linkedin');
+        } catch (\Exception $e) {
+            Log::error('LinkedIn Auth Error: ' . $e->getMessage());
+            return redirect('http://localhost:5173/login?error=linkedin_failed');
+        }
+    }
+
+    /**
+     * 🔄 LOGIQUE COMMUNE POUR LOGIN SOCIAL
+     */
+    private function handleSocialLogin($socialUser, $provider)
+    {
+        // Extraction des données selon que ce soit un objet Socialite ou stdClass
+        $id = is_object($socialUser) && method_exists($socialUser, 'getId') ? $socialUser->getId() : ($socialUser->id ?? null);
+        $email = is_object($socialUser) && method_exists($socialUser, 'getEmail') ? $socialUser->getEmail() : ($socialUser->email ?? null);
+        $name = is_object($socialUser) && method_exists($socialUser, 'getName') ? $socialUser->getName() : ($socialUser->name ?? null);
+        $avatar = is_object($socialUser) && method_exists($socialUser, 'getAvatar') ? $socialUser->getAvatar() : ($socialUser->avatar ?? null);
+
+        $user = User::where('email', $email)->first();
+
+        if (!$user) {
+            $user = User::create([
+                'name' => $name ?? 'Utilisateur',
+                'email' => $email,
+                'password' => Hash::make(Str::random(24)),
+                'role' => 'candidat',
+                'social_id' => $id,
+                'social_provider' => $provider,
+                'avatar' => $avatar,
+            ]);
+        } else {
+            $user->update([
+                'social_id' => $id,
+                'social_provider' => $provider,
+                'avatar' => $avatar ?? $user->avatar,
+            ]);
+        }
+
+        $token = $user->createToken('social_token')->plainTextToken;
+        $userJson = json_encode($user->only(['id', 'name', 'email', 'role', 'avatar']));
+
+        return redirect("http://localhost:5173/social/callback?token={$token}&user=" . urlencode($userJson));
+    }
+
+    /**
+     * 🚪 DECONNEXION
+     */
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        if ($request->user()) {
+            $request->user()->currentAccessToken()->delete();
+        }
         return response()->json(['success' => true, 'message' => 'Déconnexion réussie']);
     }
 
-    // Messages de validation réutilisables
+    /**
+     * 📦 HELPER : REPONSE AVEC TOKEN
+     */
+    private function respondWithToken($user, $message)
+    {
+        $token = $user->createToken('auth_token')->plainTextToken;
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'access_token' => $token,
+            'token_type' => 'Bearer',
+            'user' => $user
+        ], 200);
+    }
+
     private function validationMessages(): array
     {
         return [
-            'name.required' => 'Le nom est obligatoire',
-            'name.min' => 'Minimum 2 caractères',
-            'name.regex' => 'Lettres uniquement',
+            'name.required' => 'Nom obligatoire',
             'email.required' => 'Email obligatoire',
-            'email.email' => 'Format invalide',
             'email.unique' => 'Email déjà utilisé',
             'password.required' => 'Mot de passe obligatoire',
-            'password.min' => '8 caractères minimum',
-            'password.confirmed' => 'Mots de passe non identiques',
-            'password.regex' => '1 maj, 1 min, 1 chiffre',
-            'telephone.required' => 'Téléphone obligatoire pour les RH/Managers',
-            'telephone.regex' => 'Format tunisien (+216 ...)',
-            'departement.required' => 'Département obligatoire',
-            'departement.in' => 'Département invalide',
-            'position.required' => 'Position hiérarchique obligatoire',
-            'position.in' => 'Position invalide',
-            'linkedin_url.regex' => 'URL LinkedIn invalide',
+            'password.confirmed' => 'Les mots de passe ne correspondent pas',
         ];
     }
 }

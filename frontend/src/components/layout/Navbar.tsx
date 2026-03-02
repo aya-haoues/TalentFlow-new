@@ -6,6 +6,8 @@ import {
   FileTextOutlined,
   UserOutlined,
   LoginOutlined,
+  DashboardOutlined,
+  TeamOutlined
 } from '@ant-design/icons';
 import { authService } from '../../services/api';
 import type { User } from '../../types';
@@ -18,6 +20,7 @@ export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  // 🔑 Écouter les changements d'authentification
   useEffect(() => {
     const currentUser = authService.getCurrentUser();
     setUser(currentUser);
@@ -25,10 +28,18 @@ export default function Navbar() {
   }, []);
 
   const handleLogout = () => {
-    authService.logout(); // efface le token et l'utilisateur du localStorage
+    authService.logout();
     setUser(null);
     setIsAuthenticated(false);
-    navigate('/'); // redirige vers l'accueil sans rechargement
+    navigate('/');
+  };
+
+  // 🔑 Fonction pour déterminer l'URL du Dashboard selon le rôle
+  const getDashboardUrl = () => {
+    if (!user) return '/login';
+    if (user.role === 'rh') return '/dashboard/rh';
+    if (user.role === 'manager') return '/dashboard/manager';
+    return '/candidat/dashboard'; 
   };
 
   return (
@@ -44,10 +55,10 @@ export default function Navbar() {
       justifyContent: 'space-between',
       height: 64
     }}>
-      {/* Logo avec image personnalisée */}
+      {/* Logo */}
       <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
         <img 
-          src={logo}          // ← chemin vers votre logo (dans public)
+          src={logo} 
           alt="TalentFlow" 
           style={{ height: 32, width: 'auto' }} 
         />
@@ -71,6 +82,11 @@ export default function Navbar() {
             key: 'jobs',
             label: <Link to="/jobs">Offres d'emploi</Link>,
             icon: <FileTextOutlined />
+          },
+          {
+            key: 'about',
+            label: <Link to="/about">À Propos</Link>, // 👈 Ajout de la nouvelle page
+            icon: <TeamOutlined /> // N'oublie pas d'importer TeamOutlined depuis @ant-design/icons
           }
         ]}
       />
@@ -79,11 +95,16 @@ export default function Navbar() {
       <Space size="middle">
         {isAuthenticated && user ? (
           <>
-            <Link to={user.role === 'rh' ? '/dashboard/rh' : '/dashboard'}>
-              <Button type="primary" style={{ backgroundColor: '#00a89c', borderColor: '#00a89c' }}>
+            <Link to={getDashboardUrl()}>
+              <Button 
+                type="primary" 
+                icon={<DashboardOutlined />}
+                style={{ backgroundColor: '#00a89c', borderColor: '#00a89c' }}
+              >
                 {user.role === 'rh' ? 'Tableau de bord RH' : 'Mon espace'}
               </Button>
             </Link>
+            
             <Button type="text" icon={<UserOutlined />} onClick={handleLogout}>
               Déconnexion
             </Button>

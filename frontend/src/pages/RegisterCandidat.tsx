@@ -10,6 +10,7 @@ import {
 } from "@ant-design/icons";
 import { authService } from "../services/api";
 import type { RegisterFormData } from "../types";
+import SocialButtons from "../components/ui/SocialButtons";
 
 const { Title, Text } = Typography;
 
@@ -20,7 +21,6 @@ const RegisterCandidat: React.FC = () => {
   const onFinish = async (values: RegisterFormData) => {
     setLoading(true);
     try {
-      // 🔑 APPEL SPÉCIFIQUE POUR CANDIDATS
       const response = await fetch(
         "http://localhost:8000/api/register/candidat",
         {
@@ -36,15 +36,23 @@ const RegisterCandidat: React.FC = () => {
         throw new Error(data.message || "Erreur d'inscription");
       }
 
-      message.success("Inscription réussie ! Veuillez vous connecter.");
-      navigate("/login");
+      message.success("Inscription réussie ! Bienvenue.");
+
+      // 🔑 Redirection vers le dashboard candidat après inscription
+      // Note: Si ton API renvoie un token ici, stocke-le avant de naviguer
+      if (data.token) {
+        localStorage.setItem("access_token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        navigate("/candidat/dashboard");
+      } else {
+        navigate("/login");
+      }
     } catch (error: any) {
       message.error(error.message || "Erreur lors de l'inscription");
     } finally {
       setLoading(false);
     }
   };
-
   return (
     <div
       style={{
@@ -211,6 +219,11 @@ const RegisterCandidat: React.FC = () => {
               Créer mon compte candidat
             </Button>
           </Form.Item>
+
+          {/* 🔑 BOUTONS SOCIAUX AJOUTÉS ICI - SEULEMENT POUR CANDIDATS */}
+          <Form.Item>
+            <SocialButtons type="register" />
+          </Form.Item>
         </Form>
 
         <div
@@ -223,10 +236,7 @@ const RegisterCandidat: React.FC = () => {
         >
           <Text type="secondary">
             Vous avez un compte ?{" "}
-            <Link
-              to="/login"
-              style={{ color: "#00a89c", fontWeight: "600" }}
-            >
+            <Link to="/login" style={{ color: "#00a89c", fontWeight: "600" }}>
               Se connecter
             </Link>
           </Text>
