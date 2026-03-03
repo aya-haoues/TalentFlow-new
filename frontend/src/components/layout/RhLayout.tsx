@@ -1,6 +1,5 @@
 // src/components/layout/RhLayout.tsx
 import { useState } from 'react';
-import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Layout, Avatar, Space, Typography,
@@ -8,24 +7,19 @@ import {
 } from 'antd';
 import { BellOutlined, UserOutlined, DownOutlined, LogoutOutlined, SettingOutlined } from '@ant-design/icons';
 import { authService } from '../../services/api';
-import type { User } from '../../types';
-import Sidebar from './Sidebar';  // ✅ Import du composant Sidebar
+import type { User, RhLayoutProps } from '../../types';
+import Sidebar from './Sidebar';  
 
 const { Content } = Layout;
 const { Text } = Typography;
 
-interface RhLayoutProps {
-  title: string;
-  description?: string;
-  actions?: ReactNode;
-  children: ReactNode;
-}
+
 
 export default function RhLayout({ title, description, actions, children }: RhLayoutProps) {
   const navigate = useNavigate();
   const [user] = useState<User | null>(authService.getCurrentUser());
   const [collapsed, setCollapsed] = useState(false);
-  const [notificationsCount] = useState(3); // 🔴 À dynamiser
+  const [notificationsCount] = useState(3); 
 
   const { token } = theme.useToken();
   const primaryColor = token.colorPrimary ?? '#00a89c';
@@ -44,7 +38,6 @@ export default function RhLayout({ title, description, actions, children }: RhLa
     }
   };
 
-  // 🎨 Menu utilisateur (Dropdown)
   const userMenuItems = [
     { key: 'profile', label: 'Mon profil', icon: <UserOutlined />, onClick: () => message.info('Bientôt disponible') },
     { key: 'settings', label: 'Paramètres', icon: <SettingOutlined />, onClick: () => navigate('/settings') },
@@ -56,16 +49,13 @@ export default function RhLayout({ title, description, actions, children }: RhLa
     <ConfigProvider theme={{ token: { colorPrimary: primaryColor, borderRadius: 8 } }}>
       <Layout style={{ minHeight: '100vh', background: bgLayout }}>
 
-        {/* 📱 SIDEBAR - Composant indépendant */}
         <Sidebar collapsed={collapsed} onCollapse={setCollapsed} />
 
-        {/* 📄 ZONE PRINCIPALE */}
         <Layout style={{
           marginLeft: collapsed ? 80 : 260,
           transition: 'margin-left 0.2s'
         }}>
 
-          {/* 🔝 HEADER UNIQUE */}
           <Layout.Header style={{
             background: bgContainer,
             padding: '0 24px',

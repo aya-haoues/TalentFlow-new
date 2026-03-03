@@ -1,14 +1,14 @@
 // src/hooks/useModal.ts
 import { useState, useCallback } from 'react';
 
-export const useModal = <T = unknown>(initialState = false) => {
+export const useModal = <T = unknown>(initialState = false) => {   
   const [isOpen, setIsOpen] = useState(initialState);
   const [data, setData] = useState<T | null>(null);
 
-  const open = useCallback((payload?: T) => {
-    console.log('🔓 [useModal] open() appelé avec:', payload); // Debug
+  const open = useCallback((payload?: T) => {   //mode création / mode édition
+    console.log('🔓 [useModal] open() appelé avec:', payload);  
     setData(payload ?? null);
-    setIsOpen(true); // ← C'est cette ligne qui doit changer l'état !
+    setIsOpen(true); 
   }, []);
 
   const close = useCallback(() => {

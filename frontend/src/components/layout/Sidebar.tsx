@@ -1,33 +1,20 @@
 // src/components/layout/Sidebar.tsx
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Layout, Menu, Avatar, Space, Typography, theme } from 'antd';
-import logo from '../../assets/comunik.jpg'; // ← à ajuster selon votre chemin
+import logo from '../../assets/comunik.jpg'; 
 
 import {
   DashboardOutlined, FileTextOutlined, UsergroupAddOutlined,
-  SettingOutlined, TeamOutlined, SolutionOutlined
+  SettingOutlined, TeamOutlined
 } from '@ant-design/icons';
 import { authService } from '../../services/api';
-import type { User } from '../../types';
+import type { User, MenuItem, SidebarProps } from '../../types';
 
 const { Sider } = Layout;
 const { Title, Text } = Typography;
 
-interface MenuItem {
-  key: string;
-  label: string;
-  icon: React.ReactNode;
-  path: string;
-  description?: string;
-}
 
-interface SidebarProps {
-  collapsed: boolean;
-  onCollapse: (collapsed: boolean) => void;
-}
-
-// 📋 Menu latéral RH - CORRECTION DU LIEN "Offres"
 const sidebarItems: MenuItem[] = [
   { 
     key: 'dashboard', 
@@ -38,30 +25,30 @@ const sidebarItems: MenuItem[] = [
   },
   { 
     key: 'jobs', 
-    label: 'Offres', 
+    label: 'Offres d\'emploi', 
     icon: <FileTextOutlined />, 
-    path: '/rh/jobs',  // ✅ CORRECTION : /rh/jobs au lieu de /jobs
-    description: 'Gérer les offres'  // ✅ Description mise à jour
+    path: '/rh/jobs', 
+    description: 'Gérer les offres'  
   },
   { 
     key: 'applications', 
     label: 'Candidatures', 
     icon: <UsergroupAddOutlined />, 
-    path: '/rh/applications',  // ✅ Aussi corriger si nécessaire
+    path: '/rh/applications',  
     description: 'Gérer candidats' 
   },
   { 
     key: 'departments', 
     label: 'Départements', 
     icon: <TeamOutlined />, 
-    path: '/rh/departments',  // ✅ Aussi corriger si nécessaire
+    path: '/rh/departments',  
     description: 'Organisation' 
   },
   { 
     key: 'settings', 
     label: 'Paramètres', 
     icon: <SettingOutlined />, 
-    path: '/rh/settings',  // ✅ Aussi corriger si nécessaire
+    path: '/rh/settings',  
     description: 'Configuration' 
   },
 ];
@@ -69,17 +56,15 @@ const sidebarItems: MenuItem[] = [
 export default function Sidebar({ collapsed, onCollapse }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState<User | null>(null);
+  
+  const [user] = useState<User | null>(() => authService.getCurrentUser());
 
   const { token } = theme.useToken();
   const primaryColor = token.colorPrimary ?? '#00a89c';
   const borderColor = token.colorBorder ?? '#f0f0f0';
   const bgContainer = token.colorBgContainer ?? '#ffffff';
 
-  useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    setUser(currentUser);
-  }, []);
+  
 
   return (
     <Sider

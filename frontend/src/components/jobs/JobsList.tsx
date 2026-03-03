@@ -1,6 +1,8 @@
 // src/components/jobs/JobsList.tsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import type { Job } from '../../types/index';
+
 import {
   Card, Row, Col, Tag, Space, Typography, Input, Select, Button,
   Empty, Spin, Divider, Badge, message
@@ -14,25 +16,11 @@ import api from '../../services/api';
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
-interface Job {
-  id: number;
-  titre: string;
-  description: string;
-  department?: { nom: string } | null;
-  type_contrat: string;
-  niveau_experience: string;
-  type_lieu: 'remote' | 'hybrid' | 'onsite';
-  statut: string;
-  created_at: string;
-  salaire_min?: number | null;
-  salaire_max?: number | null;
-}
-
 export default function JobsList() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState({  // Objet de filtres multiples
     type_contrat: '',
     type_lieu: '',
     niveau_experience: ''
@@ -42,7 +30,7 @@ export default function JobsList() {
   useEffect(() => {
     const fetchJobs = async () => {
       try {
-        setLoading(true);
+        setLoading(true);    // Affiche le spinner
         const response = await api.get('/jobs');
         let jobsData: Job[] = [];
         if (response.data?.success && Array.isArray(response.data.data)) {
@@ -85,9 +73,9 @@ export default function JobsList() {
   // Options pour les filtres
   const contratOptions = ['CDI', 'CDD', 'Stage', 'Freelance'];
   const lieuOptions = [
-    { value: 'remote', label: '🏠 Remote' },
-    { value: 'hybrid', label: '🔄 Hybride' },
-    { value: 'onsite', label: '🏢 Sur site' }
+    { value: 'remote', label: ' Remote' },
+    { value: 'hybrid', label: ' Hybride' },
+    { value: 'onsite', label: ' Sur site' }
   ];
   const experienceOptions = ['junior', 'intermédiaire', 'senior', 'expert'];
 
@@ -220,7 +208,7 @@ export default function JobsList() {
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    <ClockCircleOutlined /> {new Date(job.created_at).toLocaleDateString('fr-FR')}
+                    <ClockCircleOutlined /> {job.created_at ? new Date(job.created_at).toLocaleDateString('fr-FR') : 'Date inconnue'}
                   </Text>
                   <Link to={`/jobs/${job.id}`}>
                     <Button type="primary" size="small" style={{ borderRadius: 6 }}>

@@ -1,3 +1,5 @@
+// src/services/api.ts
+
 import axios, { AxiosError } from 'axios';
 import type { AuthResponse, RegisterFormData, LoginFormData, User } from '../types';
 
@@ -9,11 +11,9 @@ baseURL: import.meta.env.VITE_API_URL,
 });
 
 
-// src/services/api.ts
-
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
-  // ✅ Ajouter le token à TOUTES les requêtes API
+  // Ajouter le token à TOUTES les requêtes API
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
   }

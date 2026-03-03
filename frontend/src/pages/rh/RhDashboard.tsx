@@ -1,5 +1,5 @@
 // src/pages/RhDashboard.tsx - VERSION MODIFIÉE
-import { useState, useEffect } from 'react';
+//import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Card, Row, Col, Statistic, Button, List, Tag, Progress,
@@ -14,11 +14,7 @@ import {
   FireOutlined, BarChartOutlined, EyeOutlined,
   CopyOutlined, DeleteOutlined, InfoCircleOutlined, CloseOutlined
 } from '@ant-design/icons';
-import { authService } from '../../services/api';
 import RhLayout from '../../components/layout/RhLayout';
-
-// Exemples de chemins possibles :
-import type { User } from '../../types/index';     // Si types est un dossier
 
 
 const {Text} = Typography;
@@ -96,12 +92,7 @@ const statusConfig: Record<string, { color: string; label: string; icon: React.R
 
 export default function RhDashboard() {
   const navigate = useNavigate();
-  const [User, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    setUser(currentUser as User | null);
-  }, []);
+  
 
   return (
     <RhLayout

@@ -1,23 +1,19 @@
 // src/components/jobs/JobForm.tsx
 import { useState, useEffect } from 'react';
 import {
-  Form, Input, Select, DatePicker, InputNumber, Button, Space, Typography, Row, Col, Tag, Alert
+  Form, Input, Select, DatePicker, InputNumber, Button, Space, Row, Col, Alert, message
 } from 'antd';
-import { PlusOutlined, DeleteOutlined, MinusCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import { jobsService, JOB_CONSTANTS } from '../../services/jobs';
 import { departmentsService } from '../../services/departments';
-import type { Job } from '../../types';
+import type { JobInput, JobFormProps, JobFormValues } from '../../types';
 import dayjs from 'dayjs';
+import { AxiosError } from 'axios';
 
 const { TextArea } = Input;
 const { Option } = Select;
-const { Title } = Typography;
 
-interface JobFormProps {
-  job?: Job | null;
-  onSuccess: () => void;
-  onCancel: () => void;
-}
+
 
 export default function JobForm({ job = null, onSuccess, onCancel }: JobFormProps) {
   const isEditing = !!job;
@@ -46,28 +42,39 @@ export default function JobForm({ job = null, onSuccess, onCancel }: JobFormProp
     }
   }, [job, form]);
 
-  const handleSubmit = async (values: any) => {
-    setLoading(true);
-    setServerErrors({});
+  
+  const handleSubmit = async (values: JobFormValues) => {
+  setLoading(true);
+  setServerErrors({});
 
-    try {
-      // Formatage des données
-      const payload = {
-        ...values,
-        date_limite: values.date_limite?.format('YYYY-MM-DD') || null,
-        competences_requises: values.competences_requises.filter((c: string) => c.trim() !== '')
-      };
+  try {
+   
+  const payload: JobInput = {
+      titre: values.titre,
+      department_id: values.department_id,
+      type_contrat: values.type_contrat as 'CDI' | 'CDD' | 'Stage' | 'Alternance' | 'Freelance',
+      niveau_experience: values.niveau_experience as 'junior' | 'confirme' | 'senior',
+      type_lieu: values.type_lieu as 'remote' | 'hybrid' | 'onsite',
+      statut: values.statut as 'brouillon' | 'publiee' | 'pausee' | 'archivee' | undefined,
+      description: values.description,
+      competences_requises: values.competences_requises.filter((c: string) => c.trim() !== ''),
+      nombre_postes: values.nombre_postes,
+      date_limite: values.date_limite?.format('YYYY-MM-DD') ?? null,
+      salaire_min: values.salaire_min ?? null,
+      salaire_max: values.salaire_max ?? null,
+    };
 
-      if (isEditing && job) {
-        await jobsService.update(job.id, payload);
-      } else {
-        await jobsService.create(payload);
-      }
-      onSuccess();
-    } catch (err: any) {
-      if (err.response?.status === 422) {
-        // Afficher les erreurs de validation du backend
-        const errors = err.response.data.errors || {};
+    if (isEditing && job) {
+      await jobsService.update(job.id, payload);
+    } else {
+      await jobsService.create(payload);
+    }
+    onSuccess();
+    } catch (err) {
+      // Typage de l'erreur avec AxiosError
+      const error = err as AxiosError<{ errors?: Record<string, string[]>; message?: string }>;
+      if (error.response?.status === 422) {
+        const errors = error.response.data?.errors || {};
         setServerErrors(errors);
         // Convertir en erreurs de formulaire Ant Design
         const fields = Object.keys(errors).map(field => ({
@@ -76,7 +83,7 @@ export default function JobForm({ job = null, onSuccess, onCancel }: JobFormProp
         }));
         form.setFields(fields);
       } else {
-        Alert({ message: 'Erreur', description: err.message, type: 'error' });
+        message.error(error.message || 'Erreur lors de la soumission');
       }
     } finally {
       setLoading(false);
@@ -161,9 +168,9 @@ export default function JobForm({ job = null, onSuccess, onCancel }: JobFormProp
             rules={[{ required: true }]}
           >
             <Select>
-              <Option value="remote">🏠 Remote</Option>
-              <Option value="hybrid">🔄 Hybride</Option>
-              <Option value="onsite">🏢 Sur site</Option>
+              <Option value="remote">Remote</Option>
+              <Option value="hybrid">Hybride</Option>
+              <Option value="onsite">Sur site</Option>
             </Select>
           </Form.Item>
         </Col>

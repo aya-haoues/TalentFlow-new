@@ -1,14 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Layout, Button, Space, Badge, Avatar, Dropdown, Menu } from 'antd';
+import { Layout, Button, Space, Badge, Avatar, Dropdown } from 'antd';
+import type { MenuProps } from 'antd'; 
 import { UserOutlined, LogoutOutlined, BellOutlined } from '@ant-design/icons';
 import { authService } from '../../services/api';
 
 const { Header: AntHeader } = Layout;
 
 interface HeaderProps {
-  title?: string;                // Titre de la page courante
-  notificationsCount?: number;   // Nombre de notifications non lues
+  title?: string;
+  notificationsCount?: number;
 }
 
 const Header: React.FC<HeaderProps> = ({ title, notificationsCount = 0 }) => {
@@ -16,21 +17,24 @@ const Header: React.FC<HeaderProps> = ({ title, notificationsCount = 0 }) => {
 
   const handleLogout = () => {
     authService.logout();
-    // Redirection éventuelle gérée ailleurs
   };
 
-  // Menu déroulant pour le profil
-  const userMenu = (
-    <Menu>
-      <Menu.Item key="profile">
-        <Link to="/profile">Mon profil</Link>
-      </Menu.Item>
-      <Menu.Divider />
-      <Menu.Item key="logout" onClick={handleLogout} icon={<LogoutOutlined />}>
-        Déconnexion
-      </Menu.Item>
-    </Menu>
-  );
+  // Typage explicite des items du menu  (dropdown)
+  const userMenuItems: MenuProps['items'] = [
+    {
+      key: 'profile',
+      label: <Link to="/profile">Mon profil</Link>,
+    },
+    {
+      type: 'divider',
+    },
+    {
+      key: 'logout',
+      label: 'Déconnexion',
+      icon: <LogoutOutlined />,
+      onClick: handleLogout,
+    },
+  ];
 
   return (
     <AntHeader style={{ 
@@ -74,8 +78,8 @@ const Header: React.FC<HeaderProps> = ({ title, notificationsCount = 0 }) => {
                 <Button type="text" icon={<BellOutlined style={{ fontSize: '18px' }} />} />
               </Badge>
 
-              {/* Profil avec dropdown */}
-              <Dropdown overlay={userMenu} placement="bottomRight">
+              {/* Profil avec dropdown - utilisation correcte de menu.items */}
+              <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
                 <Space style={{ cursor: 'pointer' }}>
                   <Avatar icon={<UserOutlined />} style={{ backgroundColor: '#00a89c' }} />
                   <span style={{ color: '#1a3636' }}>{user.name}</span>
@@ -83,7 +87,6 @@ const Header: React.FC<HeaderProps> = ({ title, notificationsCount = 0 }) => {
               </Dropdown>
             </Space>
           ) : (
-            // Liens de connexion/inscription si non authentifié
             <Space>
               <Link to="/login">
                 <Button>Connexion</Button>

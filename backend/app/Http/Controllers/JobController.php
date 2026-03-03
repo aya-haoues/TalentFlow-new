@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Job;
-use App\Models\Departement; // ← Vérifie que ce modèle existe !
+use App\Models\Departement; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -34,7 +34,7 @@ class JobController extends Controller
             $query->where('niveau_experience', $request->niveau_experience);
         }
 
-        // 🔗 Eager loading : évite le problème N+1 (1 requête au lieu de N)
+        // évite le problème N+1 (1 requête au lieu de N)
         $jobs = $query->with(['department', 'creator'])
                       ->latest()
                       ->paginate(10);
@@ -52,7 +52,7 @@ class JobController extends Controller
     public function store(Request $request)
     {
         try {
-            // ✅ 1. VALIDATION : règles exactes de ta migration
+            //  VALIDATION : règles exactes de ta migration
             $validated = $request->validate([
                 'titre' => 'required|string|max:255',
                 'department_id' => 'required|exists:departments,id',
@@ -61,7 +61,7 @@ class JobController extends Controller
                 'type_lieu' => 'required|in:remote,hybrid,onsite',
                 'description' => 'required|string|min:50',
                 'competences_requises' => 'required|array|min:1',
-                'competences_requises.*' => 'string|max:50', // chaque compétence
+                'competences_requises.*' => 'string|max:50',
                 'statut' => 'nullable|in:brouillon,publiee,pausee,archivee',
                 'nombre_postes' => 'nullable|integer|min:1',
                 'date_limite' => 'nullable|date|after_or_equal:today',
@@ -69,7 +69,7 @@ class JobController extends Controller
                 'salaire_max' => 'nullable|integer|min:0|gte:salaire_min',
             ]);
 
-            // ✅ 2. CRÉATION : on force created_by = RH connecté (sécurité)
+            // RH connecté (sécurité)
             $job = Job::create([
                 ...$validated,
                 'created_by' => Auth::id(),
@@ -100,7 +100,6 @@ class JobController extends Controller
      */
     public function show(Job $job)
     {
-        // 💡 Route Model Binding : Laravel cherche automatiquement par {id}
         // Si non trouvé → 404 automatique
 
         return response()->json([
@@ -115,13 +114,8 @@ class JobController extends Controller
      */
    public function update(Request $request, Job $job)
 {
-    // 🔍 Logs de debug (optionnel, pour suivre les modifications)
-    Log::info('=== UPDATE JOB ===');
-    Log::info('Job ID: ' . $job->id);
-    Log::info('Modified by User ID: ' . Auth::id());
     
     try {
-        // ✅ Validation : 'sometimes' = valide seulement si le champ est envoyé
         $validated = $request->validate([
             'titre' => 'sometimes|required|string|max:255',
             'department_id' => 'sometimes|required|exists:departments,id',
@@ -138,13 +132,12 @@ class JobController extends Controller
             'salaire_max' => 'sometimes|nullable|integer|min:0|gte:salaire_min',
         ]);
 
-        // ✅ Mise à jour de l'offre
         $job->update($validated);
 
         return response()->json([
             'success' => true,
             'message' => 'Offre mise à jour avec succès',
-            'data' => $job->fresh() // Recharge l'objet depuis la BDD
+            'data' => $job->fresh() 
         ]);
 
     } catch (\Illuminate\Validation\ValidationException $e) {
@@ -165,7 +158,6 @@ class JobController extends Controller
      */
     public function destroy(Job $job)
     {
-        // 🔐 Même vérification d'autorisation
         if ($job->created_by !== Auth::id()) {
             return response()->json([
                 'success' => false,
@@ -173,8 +165,7 @@ class JobController extends Controller
             ], 403);
         }
 
-        // ⚠️ Avec onDelete('restrict'), tu ne peux pas supprimer si des candidatures existent
-        // Option : vérifier avant de supprimer
+        // vérifier avant de supprimer si des candidatures existent
         if ($job->applications()->count() > 0) {
             return response()->json([
                 'success' => false,

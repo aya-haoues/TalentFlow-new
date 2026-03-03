@@ -13,23 +13,8 @@ import api from '../../services/api';  // ← ../../ car dans pages/rh/
 import { useModal } from '../../hooks/useModal';  // ← ../../
 import JobForm from '../../components/jobs/JobForm';  // ← ../../
 import RhLayout from '../../components/layout/RhLayout';  // ← ../../
+import type { Job } from '../../types';  // ou '../../types/index'
 
-// Types
-interface Job {
-  id: number;
-  titre: string;
-  description: string;
-  department?: { id: number; nom: string } | null;
-  type_contrat: string;
-  niveau_experience: string;
-  type_lieu: 'remote' | 'hybrid' | 'onsite';
-  statut: 'brouillon' | 'publiee' | 'pausee' | 'archivee';
-  applications_count?: number;
-  date_limite?: string | null;
-  salaire_min?: number | null;
-  salaire_max?: number | null;
-  [key: string]: any;
-}
 
 const { Text, Title } = Typography;
 
@@ -374,7 +359,7 @@ export default function RhJobsPage() {
         title={
           <Space>
             {jobModal.data ? <EditOutlined /> : <PlusOutlined />}
-            {jobModal.data ? '✏️ Modifier l\'offre' : '➕ Créer une nouvelle offre'}
+            {jobModal.data ? '✏️ Modifier l\'offre' : ' Créer une nouvelle offre'}
           </Space>
         }
         footer={null}

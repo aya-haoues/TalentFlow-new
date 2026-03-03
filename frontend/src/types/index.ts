@@ -1,4 +1,5 @@
-// ✅ TYPES SEULEMENT - AUCUNE LOGIQUE
+import type { ReactNode } from 'react';
+
 export interface User {
   id: number;
   name: string;
@@ -73,6 +74,81 @@ export interface JobFilters {
   search?: string;
   page?: number;
   per_page?: number;
+}
+
+export interface JobInput {
+  titre: string;
+  department_id: number;
+  type_contrat: 'CDI' | 'CDD' | 'Stage' | 'Alternance' | 'Freelance';
+  niveau_experience: 'junior' | 'confirme' | 'senior';
+  type_lieu: 'remote' | 'hybrid' | 'onsite';
+  description: string;
+  competences_requises: string[];
+  statut?: 'brouillon' | 'publiee' | 'pausee' | 'archivee';
+  nombre_postes?: number;
+  date_limite?: string | null;  // ← String 'YYYY-MM-DD' pour l'API
+  salaire_min?: number | null;
+  salaire_max?: number | null;
+}
+
+export interface RhLayoutProps {
+  title: string;
+  description?: string;
+  actions?: ReactNode;
+  children: ReactNode;
+}
+
+export interface MenuItem {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  path: string;
+  description?: string;
+}
+
+export interface SidebarProps {
+  collapsed: boolean;
+  onCollapse: (collapsed: boolean) => void;
+}
+
+
+export interface JobFormProps {
+  /**
+   * Offre existante pour le mode édition.
+   * Si null ou undefined → mode création.
+   */
+  job?: Job | null;
+  
+  /**
+   * Callback appelé après création/mise à jour réussie.
+   * Responsable de fermer la modale et rafraîchir la liste.
+   */
+  onSuccess: () => void;
+  
+  /**
+   * Callback appelé si l'utilisateur annule.
+   * Responsable de fermer la modale sans sauvegarder.
+   */
+  onCancel: () => void;
+}
+
+/**
+ * Valeurs du formulaire JobForm
+ * Note : date_limite utilise dayjs.Dayjs pour le DatePicker Ant Design
+ */
+export interface JobFormValues {
+  titre: string;
+  department_id: number;
+  type_contrat: 'CDI' | 'CDD' | 'Stage' | 'Alternance' | 'Freelance';
+  niveau_experience: 'junior' | 'confirme' | 'senior';
+  type_lieu: 'remote' | 'hybrid' | 'onsite';
+  description: string;
+  competences_requises: string[];
+  statut?: 'brouillon' | 'publiee' | 'pausee' | 'archivee';
+  nombre_postes?: number;
+  date_limite?: import('dayjs').Dayjs | null;  // ← Type Dayjs importé dynamiquement
+  salaire_min?: number | null;
+  salaire_max?: number | null;
 }
 
 

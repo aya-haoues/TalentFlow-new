@@ -1,5 +1,5 @@
 // src/components/layout/Navbar.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState} from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Layout, Menu, Button, Space } from 'antd';
 import {
@@ -15,20 +15,15 @@ const { Header } = Layout;
 
 export default function Navbar() {
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    setUser(currentUser);
-    setIsAuthenticated(!!currentUser);
-  }, []);
+ 
+  const [user, setUser] = useState<User | null>(() => authService.getCurrentUser());
+  
+  const isAuthenticated = !!user;
 
   const handleLogout = () => {
-    authService.logout(); // efface le token et l'utilisateur du localStorage
+    authService.logout(); 
     setUser(null);
-    setIsAuthenticated(false);
-    navigate('/'); // redirige vers l'accueil sans rechargement
+    navigate('/'); 
   };
 
   return (
@@ -77,18 +72,14 @@ export default function Navbar() {
 
       {/* Boutons */}
       <Space size="middle">
-        {isAuthenticated && user ? (
+        {isAuthenticated && user ? (    //si
           <>
-            <Link to={user.role === 'rh' ? '/dashboard/rh' : '/dashboard'}>
-              <Button type="primary" style={{ backgroundColor: '#00a89c', borderColor: '#00a89c' }}>
-                {user.role === 'rh' ? 'Tableau de bord RH' : 'Mon espace'}
-              </Button>
-            </Link>
+            
             <Button type="text" icon={<UserOutlined />} onClick={handleLogout}>
               Déconnexion
             </Button>
           </>
-        ) : (
+        ) : (    //sinon
           <>
             <Link to="/login">
               <Button type="text" icon={<LoginOutlined />}>Se connecter</Button>
