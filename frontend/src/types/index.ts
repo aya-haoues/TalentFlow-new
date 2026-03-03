@@ -181,3 +181,84 @@ export type JobsResponse = ApiResponse<Job[]>;
 
 // 🏢 Type pour la liste des départements
 export type DepartmentsResponse = ApiResponse<Department[]>;
+
+
+
+// 📝 Données du formulaire de candidature
+export interface ApplicationFormValues {
+  cv?: {
+    fileList: Array<{
+      originFileObj?: File;
+      name: string;
+      uid: string;
+    }>;
+  };
+  why_us: string;
+  handicap?: string;
+  contract_type: 'CDI' | 'CDD' | 'SIVP' | 'Freelance';
+  
+  // Sections dynamiques (tableaux)
+  experiences?: Array<{
+    entreprise: string;
+    poste?: string;
+    dates?: [string, string];  // [start, end] ISO strings
+    secteur?: string;
+    pays?: string;
+  }>;
+  
+  formations?: Array<{
+    etablissement: string;
+    diplome?: string;
+    specialite?: string;
+    dates?: [string, string];
+  }>;
+  
+  skills?: Array<{
+    nom: string;
+    niveau?: 'debutant' | 'intermediaire' | 'avance' | 'expert';
+    annees?: number;
+    lien?: string;
+  }>;
+  
+  challenges?: Array<{
+    type?: string;
+    description?: string;
+    leçon?: string;
+  }>;
+}
+
+
+
+// src/types/index.ts
+
+// 📋 Candidature à une offre
+export interface Application {
+  id: number;
+  job_id: number;
+  job?: { 
+    id: number;
+    titre: string; 
+    department?: { nom: string };
+  };
+  candidate_id: number;
+  cv_path?: string;
+  cv_original_name?: string;
+  lettre_motivation?: string;
+  telephone?: string;
+  linkedin_url?: string;
+  statut: 'en_attente' | 'acceptee' | 'refusee' | 'annulee';  // ✅ Union type
+  created_at: string;  // ISO date string
+  updated_at: string;
+}
+
+
+export interface ApplicationInput {
+  job_id: number;  // ✅ ID de l'offre visée (requis)
+  
+  // 📎 CV (géré via FormData pour l'upload)
+  cv?: File | null;  // ✅ Fichier binaire pour upload
+  contract_type_preferred: 'CDI' | 'CDD' | 'SIVP' | 'Freelance';  // ✅ Union type
+  
+  // 📅 Métadonnées (optionnelles, souvent générées côté backend)
+  date_candidature?: string;  // Format 'YYYY-MM-DD'
+}

@@ -1,11 +1,13 @@
 // src/components/layout/Navbar.tsx
-import React, { useState} from 'react';
+import React, { useState, useEffect } from 'react';  // ✅ useEffect ajouté
 import { Link, useNavigate } from 'react-router-dom';
 import { Layout, Menu, Button, Space } from 'antd';
 import {
   FileTextOutlined,
   UserOutlined,
   LoginOutlined,
+  DashboardOutlined,
+  TeamOutlined
 } from '@ant-design/icons';
 import { authService } from '../../services/api';
 import type { User } from '../../types';
@@ -15,15 +17,50 @@ const { Header } = Layout;
 
 export default function Navbar() {
   const navigate = useNavigate();
- 
-  const [user, setUser] = useState<User | null>(() => authService.getCurrentUser());
   
-  const isAuthenticated = !!user;
+  // ✅ État unique et cohérent pour l'utilisateur
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const handleLogout = () => {
-    authService.logout(); 
+  // 🔑 Charger l'utilisateur au montage et écouter les changements
+  useEffect(() => {
+    const updateAuthState = () => {
+      const currentUser = authService.getCurrentUser();
+      setUser(currentUser);
+      setIsAuthenticated(!!currentUser);
+    };
+    
+    // Initialisation au montage
+    updateAuthState();
+    
+    // Optionnel : écouter les événements de storage pour synchroniser entre onglets
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'access_token' || e.key === 'user') {
+        updateAuthState();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Cleanup au démontage
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  // 🚪 Gestion de la déconnexion
+  const handleLogout = async () => {
+    await authService.logout();  // ✅ Attendre la fin du logout
     setUser(null);
-    navigate('/'); 
+    setIsAuthenticated(false);
+    navigate('/');  // ✅ Rediriger vers l'accueil
+  };
+
+  // 🔑 URL du Dashboard selon le rôle
+  const getDashboardUrl = (): string => {
+    if (!user) return '/login';
+    if (user.role === 'rh') return '/dashboard/rh';
+    if (user.role === 'manager') return '/dashboard/manager';
+    return '/candidat/dashboard';  // Ou '/dashboard/candidat' selon tes routes
   };
 
   return (
@@ -39,17 +76,17 @@ export default function Navbar() {
       justifyContent: 'space-between',
       height: 64
     }}>
-      {/* Logo avec image personnalisée */}
+      {/* 🎨 Logo */}
       <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
         <img 
-          src={logo}          // ← chemin vers votre logo (dans public)
+          src={logo} 
           alt="TalentFlow" 
-          style={{ height: 32, width: 'auto' }} 
+          style={{ height: 32, width: 'auto', objectFit: 'contain' }} 
         />
         <span style={{ fontSize: 22, fontWeight: 'bold', color: '#004d4a' }}>TalentFlow</span>
       </Link>
 
-      {/* Menu */}
+      {/* 🧭 Menu de navigation central */}
       <Menu
         mode="horizontal"
         style={{
@@ -66,26 +103,53 @@ export default function Navbar() {
             key: 'jobs',
             label: <Link to="/jobs">Offres d'emploi</Link>,
             icon: <FileTextOutlined />
+          },
+          {
+            key: 'about',
+            label: <Link to="/about">À Propos</Link>,
+            icon: <TeamOutlined />
           }
         ]}
       />
 
-      {/* Boutons */}
+      {/* 👤 Boutons d'authentification */}
       <Space size="middle">
-        {isAuthenticated && user ? (    //si
+        {isAuthenticated && user ? (
+          // ✅ Utilisateur connecté
           <>
+            <Link to={getDashboardUrl()}>
+              <Button 
+                type="primary" 
+                icon={<DashboardOutlined />}
+                style={{ backgroundColor: '#00a89c', borderColor: '#00a89c' }}
+              >
+                {user.role === 'rh' ? 'Tableau de bord RH' : 
+                 user.role === 'manager' ? 'Espace Manager' : 'Mon espace'}
+              </Button>
+            </Link>
             
-            <Button type="text" icon={<UserOutlined />} onClick={handleLogout}>
+            <Button 
+              type="text" 
+              icon={<UserOutlined />} 
+              onClick={handleLogout}
+              style={{ color: '#666' }}
+            >
               Déconnexion
             </Button>
           </>
-        ) : (    //sinon
+        ) : (
+          // ❌ Utilisateur non connecté
           <>
             <Link to="/login">
-              <Button type="text" icon={<LoginOutlined />}>Se connecter</Button>
+              <Button type="text" icon={<LoginOutlined />}>
+                Se connecter
+              </Button>
             </Link>
             <Link to="/register">
-              <Button type="primary" style={{ backgroundColor: '#00a89c', borderColor: '#00a89c' }}>
+              <Button 
+                type="primary" 
+                style={{ backgroundColor: '#00a89c', borderColor: '#00a89c' }}
+              >
                 S'inscrire
               </Button>
             </Link>

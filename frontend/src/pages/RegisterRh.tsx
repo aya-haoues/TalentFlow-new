@@ -151,7 +151,7 @@ const RegisterRh: React.FC = () => {
         <div style={{ textAlign: 'center', marginTop: '1.5rem', borderTop: '1px solid #f0f0f0', paddingTop: '1.5rem' }}>
           <Text type="secondary">
             Vous avez un compte ?{' '}
-            <Link to="/login" style={{ color: '#00a89c', fontWeight: '600' }}>S'inscrire ici</Link>
+            <Link to="/login/rh" style={{ color: '#00a89c', fontWeight: '600' }}>Se connecter</Link>
           </Text>
         </div>
       </Card>
