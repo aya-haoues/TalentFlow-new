@@ -1,5 +1,5 @@
 // src/pages/Home.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Layout, Button, Typography, Space } from 'antd';
 import { RocketOutlined, UserOutlined } from '@ant-design/icons';
@@ -10,46 +10,54 @@ const { Content, Footer } = Layout;
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
-
-  // 🔑 Utiliser useEffect pour lire le localStorage au chargement
-  useEffect(() => {
+  
+  // ✅ SOLUTION 1 : Ne déclarer que 'user' puisque setUser n'est pas utilisé
+  const [user] = useState<User | null>(() => {    //pourquoi on utilise pas setUser??
     const userStr = localStorage.getItem('user');
     if (userStr) {
       try {
-        setUser(JSON.parse(userStr));
+        return JSON.parse(userStr) as User;
       } catch (e) {
-        console.error("Erreur parsing user", e);
+        console.error("❌ Erreur parsing user:", e);
+        return null;
       }
     }
-  }, []);
+    return null;
+  });
 
   // 🔑 Fonction de redirection robuste
   const goToDashboard = () => {
-    // On re-vérifie le localStorage au cas où l'état n'aurait pas encore synchronisé
+    // Re-lire localStorage pour avoir la donnée la plus récente
     const currentUserStr = localStorage.getItem('user');
     if (!currentUserStr) {
       navigate('/login');
       return;
     }
 
-    const currentUser = JSON.parse(currentUserStr);
-    
-    console.log("Utilisateur détecté:", currentUser); // Pour debug
-
-    if (currentUser.role === 'rh') {
-      navigate('/dashboard/rh');
-    } else if (currentUser.role === 'manager') {
-      navigate('/dashboard/manager');
-    } else {
-      // Par défaut pour candidat ou default
-      navigate('/candidat/dashboard');
+    try {
+      const currentUser = JSON.parse(currentUserStr) as User;
+      
+      if (currentUser.role === 'rh') {
+        navigate('/dashboard/rh');
+      } else if (currentUser.role === 'manager') {
+        navigate('/dashboard/manager');
+      } else {
+        navigate('/candidat/dashboard');
+      }
+    } catch (e) {
+      console.error("❌ Erreur parsing user pour redirection:", e);
+      navigate('/login');
     }
   };
 
   return (
     <Layout style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Content style={{ padding: '4rem 1rem', background: 'linear-gradient(135deg, #e6fffb 0%, #f0fdfa 100%)', display: 'flex', alignItems: 'center' }}>
+      <Content style={{ 
+        padding: '4rem 1rem', 
+        background: 'linear-gradient(135deg, #e6fffb 0%, #f0fdfa 100%)', 
+        display: 'flex', 
+        alignItems: 'center' 
+      }}>
         <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
           
           {user && (
@@ -93,7 +101,7 @@ const Home: React.FC = () => {
                 size="large"
                 type="primary"
                 icon={<UserOutlined />}
-                onClick={goToDashboard} // 👈 Appel de la fonction
+                onClick={goToDashboard}
                 style={{
                   fontSize: '1.1rem', padding: '0 2rem', height: '3.5rem',
                   fontWeight: 'bold', backgroundColor: '#004d4a', borderColor: '#004d4a'

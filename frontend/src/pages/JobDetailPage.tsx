@@ -7,7 +7,7 @@ import {
   Descriptions
 } from 'antd';
 import {
-  FileTextOutlined, ArrowLeftOutlined,
+  FileTextOutlined,
   MoneyCollectOutlined, CalendarOutlined, TeamOutlined
 } from '@ant-design/icons';
 import api from '../services/api';
@@ -40,36 +40,69 @@ export default function JobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // src/pages/JobDetailPage.tsx (extrait du useEffect corrigé)
+
+useEffect(() => {
   const fetchJob = async () => {
     try {
-      setLoading(true);
-      
-      // ✅ Appel API avec typage explicite
-      const response = await api.get<{ success?: boolean; data?: Job }>(`/jobs/${id}`);
-      
-      if (response.data?.success && response.data.data) {
-        setJob(response.data.data);
-      } else if (response.data) {
-        setJob(response.data as Job);
-      } else {
-        setError('Offre non trouvée');
+      if (!id) {
+        throw new Error('ID de l\'offre manquant');
       }
       
-    } catch (err: unknown) {  // ✅ Remplacer 'any' par 'unknown'
+      setLoading(true);
+      setError(null);
       
-      // ✅ Type guard pour accéder aux propriétés de l'erreur
-      let errorMessage = 'Erreur lors du chargement';
+      const response = await api.get(`/jobs/${id}`);
       
-      if (err && typeof err === 'object') {
-        // ✅ Vérifier si c'est une erreur Axios
-        if ('response' in err) {
-          const axiosError = err as { response?: { data?: { message?: string } } };
-          errorMessage = axiosError.response?.data?.message || 'Erreur lors du chargement';
-        } else if (err instanceof Error) {
-          // ✅ Erreur JavaScript native
-          errorMessage = err.message;
+      // 🔍 DEBUG : Voir exactement ce que l'API renvoie
+      console.log('📥 response.data COMPLET:', response.data);
+      console.log('📥 response.data en JSON:', JSON.stringify(response.data, null, 2));
+      
+      let jobData: Job | null = null;
+      
+      // Essayer tous les formats possibles
+      if (response.data?.success && response.data?.data) {
+        // Format: { success: true, data: Job }
+        console.log('✅ Format: { success, data }');
+        jobData = response.data.data;
+      }
+      else if (response.data?.data && typeof response.data.data === 'object' && 'titre' in response.data.data) {
+        // Format: { data: Job }
+        console.log('✅ Format: { data }');
+        jobData = response.data.data;
+      }
+      else if (response.data?.titre) {
+        // Format direct: Job
+        console.log('✅ Format: Job direct');
+        jobData = response.data as Job;
+      }
+      else if (Array.isArray(response.data?.data) && response.data.data.length > 0) {
+        // Format: { data: [Job] }
+        console.log('✅ Format: { data: [Job] }');
+        jobData = response.data.data[0];
+      }
+      else {
+        console.error('❌ Format inconnu:', response.data);
+        throw new Error('Format de réponse non reconnu');
+      }
+      
+      setJob(jobData);
+      
+    } catch (err: unknown) {
+      console.error('❌ Erreur:', err);
+      
+      let errorMessage = 'Impossible de charger cette offre';
+      
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { status?: number; data?: { message?: string } } };
+        
+        if (axiosError.response?.status === 404) {
+          errorMessage = 'Cette offre n\'existe plus';
+        } else if (axiosError.response?.data?.message) {
+          errorMessage = axiosError.response.data.message;
         }
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
       }
       
       setError(errorMessage);
@@ -114,8 +147,12 @@ const handleApply = () => {
     return (
       <Layout style={{ minHeight: '100vh' }}>
         <Content style={{ padding: '50px', textAlign: 'center' }}>
-          <Alert message="Erreur" description={error || 'Offre introuvable'} type="error" showIcon />
-          <Button type="primary" onClick={() => navigate('/jobs')} style={{ marginTop: 16 }}>
+<Alert 
+  title="Erreur" 
+  description={error || 'Offre introuvable'} 
+  type="error" 
+  showIcon 
+/>          <Button type="primary" onClick={() => navigate('/jobs')} style={{ marginTop: 16 }}>
             Retour aux offres
           </Button>
         </Content>
@@ -127,14 +164,7 @@ const handleApply = () => {
     <Layout style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Content style={{ padding: '2rem 1rem', background: '#f5f5f5', flex: 1 }}>
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-          <Button
-            type="link"
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate(-1)}
-            style={{ marginBottom: 16, paddingLeft: 0 }}
-          >
-            Retour
-          </Button>
+          
 
           <Card bordered={false} style={{ borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>

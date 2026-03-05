@@ -30,11 +30,12 @@ const sidebarItems: MenuItem[] = [
     path: '/rh/jobs', 
     description: 'Gérer les offres'  
   },
+  // Modifiez l'objet "applications" dans sidebarItems
   { 
     key: 'applications', 
     label: 'Candidatures', 
     icon: <UsergroupAddOutlined />, 
-    path: '/rh/applications',  
+    path: '/rh/candidates', // 👈 Changez '/rh/applications' en '/rh/candidates'
     description: 'Gérer candidats' 
   },
   { 

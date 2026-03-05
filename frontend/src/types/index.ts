@@ -262,3 +262,95 @@ export interface ApplicationInput {
   // 📅 Métadonnées (optionnelles, souvent générées côté backend)
   date_candidature?: string;  // Format 'YYYY-MM-DD'
 }
+
+
+
+// src/types/index.ts
+
+// 📎 Fichier uploadé (Ant Design Upload)
+export interface UploadedFile {
+  uid: string;
+  name: string;
+  status: 'done' | 'uploading' | 'error' | 'removed';
+  url?: string;
+  originFileObj?: File;  // ✅ Important : le fichier brut
+}
+
+export interface UploadField {
+  fileList: UploadedFile[];
+}
+
+// 💼 Expérience professionnelle
+export interface ExperienceInput {
+  entreprise: string;
+  poste?: string;
+  dates?: [string, string];
+  secteur?: string;
+  pays?: string;
+  description?: string;
+}
+
+// 🎓 Formation
+export interface FormationInput {
+  etablissement: string;
+  diplome?: string;
+  specialite?: string;
+  dates?: [string, string];
+  description?: string;
+}
+
+// 🛠️ Compétence
+export interface SkillInput {
+  nom: string;
+  niveau?: 'debutant' | 'intermediaire' | 'avance' | 'expert';
+  annees?: number | null;
+  lien?: string;
+}
+
+// 🎯 Défi professionnel
+export interface ChallengeInput {
+  type?: string;
+  description?: string;
+  leçon?: string;
+}
+
+// src/types/index.ts
+
+export interface PersonalInfoInput {
+  nom: string;
+  prenom: string;
+  email: string;
+  telephone: string;
+  
+  // ✅ Typage flexible pour compatibilité avec DatePicker (Moment/Dayjs)
+  date_naissance?: string | Date | { format: (fmt: string) => string } | null;
+  
+  adresse?: {
+    rue?: string;
+    ville?: string;
+    code_postal?: string;
+    pays?: string;
+  };
+  linkedin_url?: string;
+  github_url?: string;
+  site_web?: string;
+  genre?: 'homme' | 'femme' | 'autre' | 'prefer_ne_pas_repondre';
+  nationalite?: string;
+}
+
+// 📋 Mettre à jour ApplicationFormValues pour inclure personal_info
+export interface ApplicationFormValues {
+  cv?: UploadField;
+  
+  // ✅ NOUVEAU : Informations personnelles
+  personal_info?: PersonalInfoInput;
+  
+  experiences?: ExperienceInput[];
+  formations?: FormationInput[];
+  skills?: SkillInput[];
+  challenges?: ChallengeInput[];
+  
+  why_us: string;
+  handicap?: string;
+  contract_type: 'CDI' | 'CDD' | 'SIVP' | 'Freelance' | 'Alternance';
+}

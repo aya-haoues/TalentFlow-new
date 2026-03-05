@@ -12,15 +12,83 @@ use Illuminate\Support\Facades\Log;
 
 class JobController extends Controller
 {
-    /**
-     * LISTE des offres (avec filtres)
+     /**
+     * Liste des offres PUBLIÉES uniquement (publique)
      * GET /api/jobs
+     */
+    public function indexPublic(Request $request)
+    {
+        $query = Job::query();
+
+        // Filtres optionnels pour le public
+        if ($request->filled('type_contrat')) {
+            $query->where('type_contrat', $request->type_contrat);
+        }
+        if ($request->filled('niveau_experience')) {
+            $query->where('niveau_experience', $request->niveau_experience);
+        }
+        if ($request->filled('type_lieu')) {
+            $query->where('type_lieu', $request->type_lieu);
+        }
+        if ($request->filled('department_id')) {
+            $query->where('department_id', $request->department_id);
+        }
+        if ($request->filled('search')) {
+            $query->where(function($q) use ($request) {
+                $q->where('titre', 'like', "%{$request->search}%")
+                  ->orWhere('description', 'like', "%{$request->search}%");
+            });
+        }
+
+        // ✅ Filtrer uniquement les offres publiées + eager loading
+        $jobs = $query->where('statut', 'publiee')
+                      ->with(['department'])
+                      ->latest()
+                      ->paginate(10);
+
+        return response()->json([
+            'success' => true,
+            'data' => $jobs
+        ]);
+    }
+
+    /**
+     * Détail d'une offre PUBLIÉE uniquement (publique)
+     * GET /api/jobs/{id}
+     */
+    public function showPublic($id)
+    {
+        $job = Job::with(['department'])
+                  ->where('id', $id)
+                  ->where('statut', 'publiee')  // ✅ Seulement les offres publiées
+                  ->first();
+        
+        if (!$job) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Offre non trouvée ou non publiée'
+            ], 404);
+        }
+        
+        return response()->json([
+            'success' => true,
+            'data' => $job
+        ]);
+    }
+
+    // ========================================================================
+    // 👨‍💼 MÉTHODES RH (Avec authentification et autorisation)
+    // ========================================================================
+
+    /**
+     * Liste des offres pour RH (tous statuts)
+     * GET /api/rh/jobs
      */
     public function index(Request $request)
     {
         $query = Job::query();
 
-        // 🔍 Filtres optionnels
+        // Filtres RH (incluant le statut)
         if ($request->filled('statut')) {
             $query->where('statut', $request->statut);
         }
@@ -34,7 +102,6 @@ class JobController extends Controller
             $query->where('niveau_experience', $request->niveau_experience);
         }
 
-        // évite le problème N+1 (1 requête au lieu de N)
         $jobs = $query->with(['department', 'creator'])
                       ->latest()
                       ->paginate(10);
@@ -45,6 +112,19 @@ class JobController extends Controller
         ]);
     }
 
+    /**
+     * Détail d'une offre pour RH (tous statuts)
+     * GET /api/rh/jobs/{id}
+     */
+    public function show(Job $job)
+    {
+        $job->load(['department', 'creator', 'applications']);
+        
+        return response()->json([
+            'success' => true,
+            'data' => $job
+        ]);
+    }
     /**
      * CRÉER une offre
      * POST /api/jobs
@@ -94,19 +174,6 @@ class JobController extends Controller
         }
     }
 
-    /**
-     * AFFICHER une offre
-     * GET /api/jobs/{id}
-     */
-    public function show(Job $job)
-    {
-        // Si non trouvé → 404 automatique
-
-        return response()->json([
-            'success' => true,
-            'data' => $job->load(['department', 'creator', 'applications'])
-        ]);
-    }
 
     /**
      * MODIFIER une offre

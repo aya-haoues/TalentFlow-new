@@ -12,6 +12,8 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
+    // backend/app/Models/User.php
+
     protected $fillable = [
         'name',
         'email',
@@ -20,6 +22,11 @@ class User extends Authenticatable
         'telephone',
         'linkedin_url',
         'departement',
+        // ✅ Champs social auth génériques
+        'social_provider',
+        'social_id',
+        'avatar',
+        'email_verified_at',
     ];
 
     protected $hidden = [
@@ -29,6 +36,13 @@ class User extends Authenticatable
 
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'password' => 'hashed',
     ];
+
+// ✅ Helper pour vérifier si l'utilisateur est connecté via un provider social
+public function isSocialAccount(): bool
+{
+    return !empty($this->social_provider) && !empty($this->social_id);
+}
+
+
 }

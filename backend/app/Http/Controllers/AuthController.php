@@ -10,27 +10,25 @@ use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Http;
 
 class AuthController extends Controller
 {
-    /**
-     *  INSCRIPTION CANDIDAT (Avec détection de compte Social existant)
-     */
+    /* ═══════════════════════════════════════════════════════
+       INSCRIPTIONS
+       ═══════════════════════════════════════════════════════ */
+
     public function registerCandidat(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'min:2', 'max:100', 'regex:/^[a-zA-Zàâçéèêëîïôûùüÿñæœ\s]+$/u'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'], // Le 'unique' bloque ici
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'string', 'min:8', 'confirmed', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/[0-9]/'],
             'telephone' => ['nullable', 'string', 'regex:/^(\+216|00216|0)?[23456789]\d{7}$/'],
             'linkedin_url' => ['nullable', 'url'],
         ], $this->validationMessages());
 
         if ($validator->fails()) {
-            // 🔍 LOGIQUE PERSONNALISÉE : Vérifier si l'email existe déjà via un login Social
             $existingUser = User::where('email', $request->email)->first();
-
             if ($existingUser && $existingUser->social_provider) {
                 return response()->json([
                     'success' => false,
@@ -39,11 +37,9 @@ class AuthController extends Controller
                     ]
                 ], 422);
             }
-
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        // Si la validation passe, on crée l'utilisateur
         $user = User::create([
             'name' => trim($request->name),
             'email' => strtolower(trim($request->email)),
@@ -55,9 +51,7 @@ class AuthController extends Controller
 
         return $this->respondWithToken($user, 'Inscription réussie !');
     }
-    /**
-     *  INSCRIPTION RH
-     */
+
     public function registerRh(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -84,138 +78,222 @@ class AuthController extends Controller
         return $this->respondWithToken($user, 'Compte RH créé.');
     }
 
-    /**
-     *  LOGIN UNIFIÉ
-     */
+    /* ═══════════════════════════════════════════════════════
+       LOGIN EMAIL/PASSWORD
+       ═══════════════════════════════════════════════════════ */
+
     public function login(Request $request)
-    {
-        $credentials = $request->only('email', 'password');
+{
+    $user = \App\Models\User::where('email', $request->email)->first();
 
-        if (!Auth::attempt($credentials)) {
-            return response()->json(['success' => false, 'message' => 'Email ou mot de passe incorrect'], 401);
-        }
-
-        /** @var \App\Models\User $user */
-        $user = Auth::user();
-        return $this->respondWithToken($user, 'Connexion réussie');
+if (!$user || !Hash::check($request->password, $user->password)) {
+            return response()->json([
+            'success' => false,
+            'message' => 'Email ou mot de passe incorrect'
+        ], 401);
     }
 
-    /**
-     *  MÉTHODES SOCIALES (GOOGLE)
-     */
+    return $this->respondWithToken($user, 'Connexion réussie');
+}
+
+    /* ═══════════════════════════════════════════════════════
+       GOOGLE OAUTH
+       ═══════════════════════════════════════════════════════ */
+
     public function redirectToGoogle()
-    {
-        /** @var \Laravel\Socialite\Two\AbstractProvider $driver */
-        $driver = Socialite::driver('google');
-        return $driver->stateless()->redirect();
+{
+    $from = request()->query('from');
+    
+    // ✅ Encoder 'from' dans le state OAuth pour le récupérer au callback
+    $state = $from ? base64_encode(json_encode(['from' => $from])) : null;
+    
+    $driver = Socialite::driver('google')
+        ->scopes(['openid', 'profile', 'email'])
+        ->stateless();
+    
+    if ($state) {
+        $driver = $driver->with(['state' => $state]);
     }
+    
+    return $driver->redirect();
+}
 
     public function handleGoogleCallback()
     {
         try {
-            /** @var \Laravel\Socialite\Two\AbstractProvider $driver */
-            $driver = Socialite::driver('google');
-            $socialUser = $driver->stateless()->user();
+            $googleUser = Socialite::driver('google')
+                ->scopes(['openid', 'profile', 'email'])
+                ->stateless()
+                ->user();
 
-            return $this->handleSocialLogin($socialUser, 'google');
+            if (!$googleUser->getEmail()) {
+                Log::warning('⚠️ Google: No email provided', ['user' => $googleUser->getId()]);
+                return $this->redirectWithError('no_email_from_google');
+            }
+
+            return $this->handleSocialLogin($googleUser, 'google');
+
+        } catch (\Laravel\Socialite\Two\InvalidStateException $e) {
+            Log::error('❌ Google: Invalid state', ['message' => $e->getMessage()]);
+            return $this->redirectWithError('invalid_state');
         } catch (\Exception $e) {
-            Log::error('Google Auth Error: ' . $e->getMessage());
-            return redirect('http://localhost:5173/login?error=google_failed');
-        }
-    }
-
-    /**
-     * 🔑 MÉTHODES SOCIALES (LINKEDIN - OpenID Connect)
-     */
-    public function redirectToLinkedIn()
-    {
-        /** @var \Laravel\Socialite\Two\AbstractProvider $driver */
-        $driver = Socialite::driver('linkedin');
-
-        return $driver->scopes(['openid', 'profile', 'email'])
-            ->stateless()
-            ->redirect();
-    }
-
-    public function handleLinkedInCallback(Request $request)
-    {
-        $code = $request->query('code');
-
-        if (!$code) {
-            return redirect('http://localhost:5173/login?error=no_code_provided');
-        }
-
-        try {
-            // Échange du code contre Token via HTTP Client
-            $tokenResponse = Http::asForm()->post('https://www.linkedin.com/oauth/v2/accessToken', [
-                'grant_type'    => 'authorization_code',
-                'code'          => $code,
-                'redirect_uri'  => config('services.linkedin.redirect'),
-                'client_id'     => config('services.linkedin.client_id'),
-                'client_secret' => config('services.linkedin.client_secret'),
+            Log::error('❌ Google: Unexpected error', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
-
-            if ($tokenResponse->failed()) throw new \Exception("LinkedIn Token Failed");
-
-            $accessToken = $tokenResponse->json()['access_token'];
-
-            // Récupération Profil via OpenID
-            $userResponse = Http::withToken($accessToken)->get('https://api.linkedin.com/v2/userinfo');
-            $userData = $userResponse->json();
-
-            // Objet standard pour le login
-            $socialUser = new \stdClass();
-            $socialUser->id = $userData['sub'];
-            $socialUser->name = $userData['name'];
-            $socialUser->email = $userData['email'];
-            $socialUser->avatar = $userData['picture'] ?? null;
-
-            return $this->handleSocialLogin($socialUser, 'linkedin');
-        } catch (\Exception $e) {
-            Log::error('LinkedIn Auth Error: ' . $e->getMessage());
-            return redirect('http://localhost:5173/login?error=linkedin_failed');
+            return $this->redirectWithError('social_auth_failed');
         }
     }
 
-    /**
-     * 🔄 LOGIQUE COMMUNE POUR LOGIN SOCIAL
-     */
-    private function handleSocialLogin($socialUser, $provider)
-    {
-        // Extraction des données selon que ce soit un objet Socialite ou stdClass
-        $id = is_object($socialUser) && method_exists($socialUser, 'getId') ? $socialUser->getId() : ($socialUser->id ?? null);
-        $email = is_object($socialUser) && method_exists($socialUser, 'getEmail') ? $socialUser->getEmail() : ($socialUser->email ?? null);
-        $name = is_object($socialUser) && method_exists($socialUser, 'getName') ? $socialUser->getName() : ($socialUser->name ?? null);
-        $avatar = is_object($socialUser) && method_exists($socialUser, 'getAvatar') ? $socialUser->getAvatar() : ($socialUser->avatar ?? null);
+    /* ═══════════════════════════════════════════════════════
+       LINKEDIN OAUTH (OpenID Connect)
+       ═══════════════════════════════════════════════════════ */
 
-        $user = User::where('email', $email)->first();
+   public function redirectToLinkedIn()
+{
+    return Socialite::driver('linkedin-openid')
+        ->stateless()
+        ->redirect();
+}
+
+public function handleLinkedInCallback()
+{
+    try {
+        $linkedinUser = Socialite::driver('linkedin-openid')
+            ->stateless()
+            ->user();
+
+        if (!$linkedinUser->getEmail()) {
+            return $this->redirectWithError('no_email_from_linkedin');
+        }
+
+        return $this->handleSocialLogin($linkedinUser, 'linkedin');
+
+    } catch (\Exception $e) {
+        Log::error('❌ LinkedIn error', ['message' => $e->getMessage()]);
+        return $this->redirectWithError('social_auth_failed');
+    }
+}
+    /* ═══════════════════════════════════════════════════════
+       LOGIQUE COMMUNE POUR GOOGLE ET LINKEDIN
+       ═══════════════════════════════════════════════════════ */
+
+    private function handleSocialLogin($socialUser, string $provider)
+    {
+        // ✅ Extraire les données de manière sécurisée
+        $email = $socialUser->getEmail();
+        if ($email) {
+            $email = strtolower(trim($email));
+        }
+        
+        $socialId = $socialUser->getId();
+        $name = $socialUser->getName() ?? 'Utilisateur';
+        $avatar = $socialUser->getAvatar();
+
+        // ✅ Vérifier que l'email est présent (requis pour l'authentification)
+        if (!$email) {
+            Log::warning('⚠️ Social login: No email', ['provider' => $provider, 'social_id' => $socialId]);
+            return $this->redirectWithError("no_email_from_{$provider}");
+        }
+
+        // ✅ Chercher un utilisateur par email OU par [provider + social_id]
+        $user = User::where('email', $email)
+            ->orWhere(function ($query) use ($provider, $socialId) {
+                $query->where('social_provider', $provider)
+                      ->where('social_id', $socialId);
+            })
+            ->first();
 
         if (!$user) {
+            // ✅ Créer un nouvel utilisateur
             $user = User::create([
-                'name' => $name ?? 'Utilisateur',
+                'name' => $name,
                 'email' => $email,
-                'password' => Hash::make(Str::random(24)),
+                'password' => Hash::make(Str::random(40)),  // cast 'hashed' supprimé donc ok
+                'email_verified_at' => now(),  // Le provider a déjà vérifié l'email
                 'role' => 'candidat',
-                'social_id' => $id,
                 'social_provider' => $provider,
+                'social_id' => $socialId,
                 'avatar' => $avatar,
             ]);
+            Log::info('✅ Social user created', [
+                'user_id' => $user->id,
+                'provider' => $provider,
+                'email' => $email
+            ]);
         } else {
-            $user->update([
-                'social_id' => $id,
+            // ✅ Mettre à jour les infos sociales si l'utilisateur existe
+            $updateData = [
                 'social_provider' => $provider,
+                'social_id' => $socialId,
                 'avatar' => $avatar ?? $user->avatar,
+            ];
+            
+            // Si l'utilisateur n'a pas de mot de passe (créé via social), en générer un
+            if (empty($user->password) || $user->password === '') {
+                $updateData['password'] = bcrypt(Str::random(40));
+            }
+            
+            $user->update($updateData);
+            Log::info('✅ Social user updated', [
+                'user_id' => $user->id,
+                'provider' => $provider
             ]);
         }
 
-        $token = $user->createToken('social_token')->plainTextToken;
-        $userJson = json_encode($user->only(['id', 'name', 'email', 'role', 'avatar']));
+        // ✅ Générer le token Sanctum
+        $token = $user->createToken('auth_token')->plainTextToken;
 
-        return redirect("http://localhost:5173/social/callback?token={$token}&user=" . urlencode($userJson));
+        // ✅ Récupérer 'from' depuis le state OAuth OU query param
+    $from = null;
+    $rawState = request()->query('state');
+    
+    if ($rawState) {
+        $decoded = json_decode(base64_decode($rawState), true);
+        $from = $decoded['from'] ?? null;
+    }
+    
+    // Fallback sur query param direct
+    if (!$from) {
+        $from = request()->query('from');
+    }
+
+        // ✅ Construire l'URL de redirection vers le frontend
+        $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:5173'), '/');
+        
+        $redirectUrl = "{$frontendUrl}/social/callback?token=" . rawurlencode($token)
+                     . '&provider=' . rawurlencode($provider);  // ✅ Ajouter provider pour le frontend
+
+        // ✅ Ajouter from SI présent (pour rediriger vers ApplyJobPage)
+    if ($from) {
+        $redirectUrl .= '&from=' . rawurlencode($from);
+    }
+
+        Log::info('🔗 Social login redirect', [
+            'provider' => $provider,
+            'user_id' => $user->id,
+            'redirect_url' => $redirectUrl
+        ]);
+
+        // ✅ Utiliser redirect()->away() pour les URLs externes (cross-domain)
+        return redirect()->away($redirectUrl);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       HELPERS
+       ═══════════════════════════════════════════════════════ */
+
+    /**
+     * Helper pour rediriger vers le frontend avec une erreur
+     */
+    private function redirectWithError(string $errorCode): \Illuminate\Http\RedirectResponse
+    {
+        $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:5173'), '/');
+        return redirect()->away("{$frontendUrl}/login?error={$errorCode}");
     }
 
     /**
-     * 🚪 DECONNEXION
+     * Déconnexion
      */
     public function logout(Request $request)
     {
@@ -226,28 +304,44 @@ class AuthController extends Controller
     }
 
     /**
-     * 📦 HELPER : REPONSE AVEC TOKEN
+     * Helper : Réponse JSON avec token Sanctum
      */
-    private function respondWithToken($user, $message)
+    private function respondWithToken($user, string $message)
     {
         $token = $user->createToken('auth_token')->plainTextToken;
+        
         return response()->json([
             'success' => true,
             'message' => $message,
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'user' => $user
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'avatar' => $user->avatar,
+                'social_provider' => $user->social_provider,
+            ]
         ], 200);
     }
 
+    /**
+     * Messages de validation personnalisés
+     */
     private function validationMessages(): array
     {
         return [
             'name.required' => 'Nom obligatoire',
             'email.required' => 'Email obligatoire',
             'email.unique' => 'Email déjà utilisé',
+            'email.email' => 'Format d\'email invalide',
             'password.required' => 'Mot de passe obligatoire',
+            'password.min' => 'Le mot de passe doit contenir au moins 8 caractères',
             'password.confirmed' => 'Les mots de passe ne correspondent pas',
+            'password.regex' => 'Le mot de passe doit contenir des minuscules, majuscules et chiffres',
+            'telephone.regex' => 'Numéro de téléphone tunisien invalide',
+            'linkedin_url.url' => 'URL LinkedIn invalide',
         ];
     }
 }

@@ -1,192 +1,203 @@
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Form, Input, Button, Card, Typography, message } from "antd";
-import { UserOutlined, LockOutlined } from "@ant-design/icons";
-import { authService } from "../services/api";
-import type { LoginFormData } from "../types";
-import SocialButtons from "../components/ui/SocialButtons";
+// src/pages/Login.tsx
+import React, { useState } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { Form, Input, Button, Typography, Divider, Alert, message } from 'antd';
+import { UserOutlined, LockOutlined, GoogleOutlined, LinkedinOutlined } from '@ant-design/icons';
+import { authService } from '../services/api';
+import type { LoginFormData } from '../types';  // ✅ Import des types
+import { useParams } from 'react-router-dom';
+
 
 const { Title, Text } = Typography;
 
-const Login: React.FC = () => {
+export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { role } = useParams<{ role?: string }>(); // ✅ dans le composant
   const [loading, setLoading] = useState(false);
-  const [loginType, setLoginType] = useState<"candidat" | "rh" | "manager">(
-    "candidat"
-  );
-  const [pageTitle, setPageTitle] = useState("Connexion Candidat");
-  const [registerPath, setRegisterPath] = useState("/register");
-  const [registerLabel, setRegisterLabel] = useState(
-    "Créer un compte candidat"
-  );
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    // 🔑 DÉTERMINATION PRÉCISE DU TYPE DE LOGIN ET LIENS D'INSCRIPTION
-    if (location.pathname === "/login/rh") {
-      setLoginType("rh");
-      setPageTitle("Connexion Responsable RH");
-      setRegisterPath("/register/rh");
-      setRegisterLabel("Pas de compte RH ? Créer un compte Responsable RH");
-    } else if (location.pathname === "/login/manager") {
-      setLoginType("manager");
-      setPageTitle("Connexion Manager");
-      setRegisterPath("/register/manager");
-      setRegisterLabel("Pas de compte Manager ? Créer un compte Manager");
-    } else {
-      setLoginType("candidat");
-      setPageTitle("Connexion Candidat");
-      setRegisterPath("/register");
-      setRegisterLabel("Pas de compte ? Créer un compte candidat");
-    }
-  }, [location]);
+  
 
+const handleGoogleLogin = () => {
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  
+  // ✅ Récupérer 'from' depuis location.state OU l'URL actuelle
+  const from = (location.state as { from?: string })?.from 
+               || sessionStorage.getItem('oauth_from');
+  
+  let redirectUrl = `${apiUrl}/auth/google/redirect`;
+  
+  if (from) {
+    sessionStorage.setItem('oauth_from', from); // fallback
+    redirectUrl += `?from=${encodeURIComponent(from)}`;
+  }
+  
+  window.location.href = redirectUrl;
+};
+
+const handleLinkedInLogin = () => {
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  
+  const from = (location.state as { from?: string })?.from 
+               || sessionStorage.getItem('oauth_from');
+  
+  let redirectUrl = `${apiUrl}/auth/linkedin/redirect`;
+  
+  if (from) {
+    sessionStorage.setItem('oauth_from', from);
+    redirectUrl += `?from=${encodeURIComponent(from)}`;
+  }
+  
+  window.location.href = redirectUrl;
+};
+
+  // ✅ Fonction de connexion email/password - TYPÉE
   const onFinish = async (values: LoginFormData) => {
     setLoading(true);
+    setError(null);
+    
     try {
-      // 🔑 Correction TypeScript : "candidat" devient "default" pour le service API
-      const apiType = loginType === "candidat" ? "default" : loginType;
-      const response = await authService.login(values, apiType as "default" | "rh" | "manager");
-
-      if (response && response.user) {
-        message.success("Connexion réussie !");
-        const userRole = response.user.role;
-
-        // 🔑 Redirections basées sur les rôles
-        if (userRole === "rh") {
-          navigate("/dashboard/rh");
-        } else if (userRole === "manager") {
-          navigate("/dashboard/manager");
-        } else {
-          navigate("/candidat/dashboard"); // Redirection candidat ajoutée
-        }
+      const loginType = role === 'rh' ? 'rh' : role === 'manager' ? 'manager' : 'default';
+      await authService.login(values, loginType); // ✅ utilisé ici, plus d'avertissement
+      
+      const from = (location.state as { from?: string })?.from;
+      if (from) {
+        navigate(from, { replace: true, state: {} });
+      } else {
+        const user = authService.getCurrentUser();
+        if (user?.role === 'rh') navigate('/dashboard/rh');
+        else if (user?.role === 'manager') navigate('/dashboard/manager');
+        else navigate('/candidat/dashboard');
       }
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.message || "Identifiants invalides";
-      message.error(errorMsg);
+      
+      message.success('Connexion réussie !');
+      
+    } catch (err: unknown) {
+      let errorMessage = 'Échec de la connexion';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { data?: { message?: string } } };
+        errorMessage = axiosError.response?.data?.message || 'Échec de la connexion';
+      }
+      setError(errorMessage);
+      message.error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "1rem",
-      }}
-    >
-      <Card
-        style={{
-          width: "100%",
-          maxWidth: "480px",
-          borderRadius: "16px",
-          boxShadow: "0 12px 30px rgba(0,0,0,0.12)",
-        }}
-      >
-        <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-          <Title level={2} style={{ margin: 0, color: "#00a89c" }}>
-            {pageTitle}
-          </Title>
-          <Text type="secondary" style={{ fontSize: "1.1rem" }}>
-            Entrez vos identifiants pour accéder à votre espace
-          </Text>
-        </div>
+    <div style={{ 
+      minHeight: '100vh', 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      background: 'linear-gradient(135deg, #e6fffb 0%, #f0fdfa 100%)',
+      padding: '20px'
+    }}>
+      <div style={{ 
+        width: '100%', 
+        maxWidth: 420, 
+        background: '#fff', 
+        padding: '40px', 
+        borderRadius: 16,
+        boxShadow: '0 8px 32px rgba(0, 168, 156, 0.1)'
+      }}>
+        <Title level={2} style={{ textAlign: 'center', color: '#004d4a', marginBottom: 8 }}>
+          Connexion
+        </Title>
+        <Text type="secondary" style={{ display: 'block', textAlign: 'center', marginBottom: 24 }}>
+          Accédez à votre espace TalentFlow
+        </Text>
 
-        <Form layout="vertical" onFinish={onFinish} autoComplete="off">
+        {error && <Alert title="Erreur" description={error} type="error" showIcon style={{ marginBottom: 16 }} />}
+
+        {/* Formulaire email/password */}
+        <Form name="login" onFinish={onFinish} layout="vertical" size="large">
           <Form.Item
             name="email"
-            rules={[
-              { required: true, message: "Email obligatoire" },
-              { type: "email", message: "Format email invalide" },
-            ]}
+            rules={[{ required: true, message: 'Email requis' }, { type: 'email', message: 'Email invalide' }]}
           >
-            <Input
-              prefix={<UserOutlined />}
-              placeholder="Votre email professionnel"
-              size="large"
-              style={{ borderRadius: "8px" }}
-            />
+            <Input prefix={<UserOutlined />} placeholder="Email" />
           </Form.Item>
 
           <Form.Item
             name="password"
-            rules={[
-              { required: true, message: "Mot de passe obligatoire" },
-              { min: 8, message: "Minimum 8 caractères" },
-            ]}
+            rules={[{ required: true, message: 'Mot de passe requis' }]}
           >
-            <Input.Password
-              prefix={<LockOutlined />}
-              placeholder="Mot de passe"
-              size="large"
-              style={{ borderRadius: "8px" }}
-            />
+            <Input.Password prefix={<LockOutlined />} placeholder="Mot de passe" />
           </Form.Item>
 
           <Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
+            <Button 
+              type="primary" 
+              htmlType="submit" 
+              block 
               loading={loading}
-              size="large"
-              block
-              style={{
-                height: "52px",
-                fontSize: "1.1rem",
-                fontWeight: "600",
-                borderRadius: "12px",
-                backgroundColor: "#00a89c",
-                borderColor: "#00a89c",
-                boxShadow: "0 4px 15px rgba(0, 168, 156, 0.3)",
+              style={{ 
+                backgroundColor: '#00a89c', 
+                borderColor: '#00a89c',
+                height: 44,
+                fontWeight: 500
               }}
             >
-              {loading ? "Connexion en cours..." : "Se connecter"}
+              Se connecter
             </Button>
-          </Form.Item>
-
-          {/* 🔑 BOUTONS SOCIAUX AJOUTÉS ICI */}
-          <Form.Item>
-            <SocialButtons type="login" />
           </Form.Item>
         </Form>
 
-        {/* 🔑 SECTION INSCRIPTION CLAIRE ET SÉPARÉE PAR RÔLE */}
-        <div
-          style={{
-            textAlign: "center",
-            marginTop: "2rem",
-            padding: "1.5rem",
-            background: "#f8fdfc",
-            borderRadius: "12px",
-            border: "1px solid #e6fffb",
-          }}
-        >
-          <Text
-            strong
-            style={{ color: "#004d4a", display: "block", marginBottom: "8px" }}
-          >
-            {registerLabel}
-          </Text>
-          <Link
-            to={registerPath}
-            style={{
-              color: "#00a89c",
-              fontWeight: "700",
-              fontSize: "1.05rem",
-              textDecoration: "underline",
+        {/* ✅ SÉPARATEUR */}
+        <Divider style={{ margin: '24px 0' }}>ou continuer avec</Divider>
+
+        {/* ✅ BOUTONS SOCIAUX - onClick attaché aux fonctions */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          
+          {/* 🔵 Bouton Google */}
+          <Button
+            block
+            size="large"
+            icon={<GoogleOutlined style={{ color: '#DB4437', fontSize: 18 }} />}
+            onClick={handleGoogleLogin}
+            style={{ 
+              height: 44,
+              border: '1px solid #dadce0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 500
             }}
           >
-            → S'inscrire maintenant
-          </Link>
+            Continuer avec Google
+          </Button>
+
+          {/* 🔷 Bouton LinkedIn */}
+          <Button
+            block
+            size="large"
+            icon={<LinkedinOutlined style={{ color: '#0A66C2', fontSize: 18 }} />}
+            onClick={handleLinkedInLogin}
+            style={{ 
+              height: 44,
+              border: '1px solid #dadce0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 500
+            }}
+          >
+            Continuer avec LinkedIn
+          </Button>
+          
         </div>
-      </Card>
+
+        {/* Lien vers inscription */}
+        <div style={{ textAlign: 'center', marginTop: 24 }}>
+          <Text type="secondary">
+            Pas encore de compte ?{' '}
+            <Link to="/register">S'inscrire gratuitement</Link>
+          </Text>
+        </div>
+      </div>
     </div>
   );
-};
-
-export default Login;
+}

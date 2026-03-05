@@ -1,166 +1,128 @@
-// src/pages/CandidatDashboard.tsx
-import React, { useEffect, useState } from 'react';
-import { Row, Col, Card, Statistic, List, Button, Typography, Space, Tag } from 'antd';  // ✅ Tag importé depuis antd
-import { 
-  FileSearchOutlined, 
-  CheckCircleOutlined, 
-  ClockCircleOutlined, 
-  ArrowRightOutlined 
+// src/pages/candidat/CandidatDashboard.tsx
+import { useNavigate } from 'react-router-dom';
+import { Row, Col, Card, Statistic, Alert, Button, Typography } from 'antd';
+import {
+  FileTextOutlined, ClockCircleOutlined, UserOutlined,
+  CheckCircleOutlined, RiseOutlined
 } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
-import CandidatLayout from '../../components/layout/CandidatLayout';
-import { applicationService, authService } from '../../services/api';
-import type { Application, User } from '../../types/index';  // ✅ Types importés
+import Navbar from '../../components/layout/Navbar';
+import ApplicationsList from './components/ApplicationsList';
+import DashboardSidebar from './components/DashboardSidebar';
+import { useDashboard } from './hooks/useDashboard';
+import { THEME } from './components/dashboardConfig';
 
 const { Title, Text } = Typography;
 
+/* ══════════════════════════════════════════════════════════
+   COMPOSANT PRINCIPAL — orchestrateur léger
+══════════════════════════════════════════════════════════ */
 export default function CandidatDashboard() {
-  // ✅ États typés correctement
-  const [stats, setStats] = useState({ total: 0, pending: 0, accepted: 0 });
-  const [recentApps, setRecentApps] = useState<Application[]>([]);  // ✅ Typé Application[]
-  const [loading, setLoading] = useState(true);
-  
-  // ✅ Utilisateur typé
-  const user: User | null = authService.getCurrentUser();
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
-    try {
-      // ✅ applicationService.getMyApplications() retourne Application[]
-      const apps: Application[] = await applicationService.getMyApplications();
-      
-      // Ne garder que les 3 dernières candidatures
-      setRecentApps(apps.slice(0, 3));
-      
-      // ✅ Calcul des stats avec typage sécurisé
-      setStats({
-        total: apps.length,
-        pending: apps.filter((a: Application) => a.statut === 'en_attente').length,  // ✅ Typé
-        accepted: apps.filter((a: Application) => a.statut === 'acceptee').length,   // ✅ Typé
-      });
-    } catch (error: unknown) {  // ✅ unknown au lieu de any
-      // Gestion type-safe de l'erreur
-      if (error instanceof Error) {
-        console.error("❌ Erreur dashboard:", error.message);
-      } else {
-        console.error("❌ Erreur inconnue:", error);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 🎨 Helper pour la couleur du tag selon le statut
-  const getStatusTagProps = (statut: Application['statut']): { color: string; label: string } => {
-    const config: Record<Application['statut'], { color: string; label: string }> = {
-      en_attente: { color: 'orange', label: 'En attente' },
-      acceptee: { color: 'green', label: 'Acceptée' },
-      refusee: { color: 'red', label: 'Refusée' },
-      annulee: { color: 'default', label: 'Annulée' }
-    };
-    return config[statut] || config.en_attente;
-  };
+  const {
+    loading, applications, stats, pagination, user,
+    searchQuery, setSearchQuery,
+    statusFilter, setStatusFilter,
+    selectedApp, drawerVisible, openDetail, closeDetail,
+    handlePageChange, handleRefresh,
+  } = useDashboard();
 
   return (
-    <CandidatLayout title="Mon Tableau de Bord">
-      <div style={{ marginBottom: 24 }}>
-        <Title level={3}>Ravi de vous revoir, {user?.name} 👋</Title>
-        <Text type="secondary">Voici un aperçu de vos activités de recherche d'emploi.</Text>
+    <>
+      <Navbar />
+
+      <div style={{ minHeight: 'calc(100vh - 64px)', background: THEME.bg, padding: '24px 16px' }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+
+          {/* ── Header ──────────────────────────────── */}
+          <div style={{ marginBottom: 24 }}>
+            <Title level={2} style={{ color: THEME.text, margin: '0 0 8px 0' }}>
+              👋 Bonjour, {user?.name?.split(' ')[0] || 'Candidat'} !
+            </Title>
+            <Text type="secondary">
+              Suivez vos candidatures et optimisez votre recherche d'emploi
+            </Text>
+          </div>
+
+          {/* ── Stats ───────────────────────────────── */}
+          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+            {[
+              { label: 'Total candidatures', value: stats.total,      color: THEME.primaryDark, icon: <FileTextOutlined style={{ color: THEME.primary }} />,   sub: 'Toutes offres confondues' },
+              { label: 'En attente',         value: stats.en_attente, color: '#1890ff',          icon: <ClockCircleOutlined style={{ color: '#1890ff' }} />,     sub: "En cours d'examen"        },
+              { label: 'En entretien',       value: stats.en_cours,   color: '#722ed1',          icon: <UserOutlined style={{ color: '#722ed1' }} />,            sub: 'Entretiens planifiés'     },
+              { label: 'Acceptées',          value: stats.acceptee,   color: '#52c41a',          icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,     sub: 'Félicitations ! 🎉'       },
+            ].map((s) => (
+              <Col xs={24} sm={12} md={6} key={s.label}>
+                <Card hoverable style={{ borderRadius: THEME.cardRadius, boxShadow: THEME.cardShadow, border: 'none', textAlign: 'center' }}
+                  styles={{ body: { padding: 20 } }}>
+                  <Statistic
+                    title={s.label}
+                    value={s.value}
+                    prefix={s.icon}
+                    valueStyle={{ color: s.color, fontWeight: 700, fontSize: 28 }}
+                  />
+                  <Text type="secondary" style={{ display: 'block', marginTop: 4, fontSize: 13 }}>{s.sub}</Text>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+
+          {/* ── Contenu principal ───────────────────── */}
+          <Row gutter={[24, 24]}>
+
+            {/* Colonne gauche : candidatures */}
+            <Col xs={24} lg={16}>
+              <ApplicationsList
+                applications={applications}
+                loading={loading}
+                pagination={pagination}
+                searchQuery={searchQuery}
+                statusFilter={statusFilter}
+                selectedApp={selectedApp}
+                drawerVisible={drawerVisible}
+                onSearchChange={setSearchQuery}
+                onStatusChange={(v) => { setStatusFilter(v); }}
+                onPageChange={handlePageChange}
+                onRefresh={handleRefresh}
+                onOpenDetail={openDetail}
+                onCloseDetail={closeDetail}
+              />
+
+              {/* Recommandations IA (placeholder) */}
+              <Card
+                title={
+                  <span>
+                    <RiseOutlined style={{ color: THEME.primary, marginRight: 8 }} />
+                    Offres recommandées pour vous
+                  </span>
+                }
+                style={{ borderRadius: THEME.cardRadius, boxShadow: THEME.cardShadow, border: 'none' }}
+              >
+                <Alert
+                  message="Personnalisez votre profil"
+                  description="Complétez vos compétences et expériences pour recevoir des recommandations personnalisées."
+                  type="info"
+                  showIcon
+                  action={
+                    <Button size="small" type="primary"
+                      style={{ backgroundColor: THEME.primary, borderColor: THEME.primary }}
+                      onClick={() => navigate('/candidat/profil')}
+                    >
+                      Modifier mon profil
+                    </Button>
+                  }
+                />
+              </Card>
+            </Col>
+
+            {/* Colonne droite : sidebar */}
+            <Col xs={24} lg={8}>
+              <DashboardSidebar user={user} stats={stats} />
+            </Col>
+
+          </Row>
+        </div>
       </div>
-
-      {/* 📊 Statistiques Rapides */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={8}>
-          <Card bordered={false} style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-            <Statistic 
-              title="Candidatures envoyées" 
-              value={stats.total} 
-              prefix={<FileSearchOutlined />} 
-              valueStyle={{ color: '#00a89c' }} 
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card bordered={false} style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-            <Statistic 
-              title="En attente" 
-              value={stats.pending} 
-              prefix={<ClockCircleOutlined />} 
-              valueStyle={{ color: '#faad14' }} 
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card bordered={false} style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-            <Statistic 
-              title="Entretiens / Acceptées" 
-              value={stats.accepted} 
-              prefix={<CheckCircleOutlined />} 
-              valueStyle={{ color: '#52c41a' }} 
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      {/* 📝 Dernières candidatures */}
-      <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
-        <Col span={24}>
-          <Card 
-            title="Candidatures Récentes" 
-            extra={<Link to="/candidat/applications">Voir tout</Link>}
-            bordered={false}
-          >
-            <List
-              loading={loading}
-              dataSource={recentApps}
-              renderItem={(item: Application) => {  // ✅ Typé Application
-                const tagProps = getStatusTagProps(item.statut);
-                
-                return (
-                  <List.Item
-                    actions={[<Link key="details" to={`/candidat/applications/${item.id}`}>Détails</Link>]}
-                  >
-                    <List.Item.Meta
-                      title={
-                        <Text strong>
-                          {item.job?.titre || `Offre #${item.job_id}`}
-                        </Text>
-                      }
-                      description={
-                        <Space direction="vertical" size={2}>
-                          <Text>
-                            Postulé le {item.created_at ? new Date(item.created_at).toLocaleDateString('fr-FR') : 'Date inconnue'}
-                          </Text>
-                          {item.job?.department?.nom && (
-                            <Text type="secondary">🏢 {item.job.department.nom}</Text>
-                          )}
-                        </Space>
-                      }
-                    />
-                    {/* ✅ Tag Ant Design avec couleur dynamique */}
-                    <Tag color={tagProps.color}>{tagProps.label}</Tag>
-                  </List.Item>
-                );
-              }}
-              locale={{ emptyText: 'Aucune candidature pour le moment' }}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      {/* 🚀 Actions Rapides */}
-      <Card style={{ marginTop: 24, background: '#e6fffb', border: '1px solid #b5f5ec' }}>
-        <Space direction="vertical">
-          <Title level={5}>Trouvez votre prochain défi !</Title>
-          <Text>Des centaines d'offres correspondent à votre profil.</Text>
-          <Button type="primary" icon={<ArrowRightOutlined />} href="/jobs">
-            Explorer les offres
-          </Button>
-        </Space>
-      </Card>
-    </CandidatLayout>
+    </>
   );
 }

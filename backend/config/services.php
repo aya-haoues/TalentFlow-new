@@ -37,12 +37,15 @@ return [
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
-        'redirect' => 'http://localhost:8000/api/auth/google/callback',
+        'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
-    'linkedin' => [
-        'client_id'     => env('LINKEDIN_CLIENT_ID'),
-        'client_secret' => env('LINKEDIN_CLIENT_SECRET'),
-        'redirect'      => 'http://localhost:8000/api/auth/linkedin/callback',
-    ],
+    // Ajoutez ce bloc spécifiquement pour le nouveau driver
+    'linkedin-openid' => [
+    'client_id'     => env('LINKEDIN_CLIENT_ID'),
+    'client_secret' => env('LINKEDIN_CLIENT_SECRET'),
+    'redirect'      => env('LINKEDIN_REDIRECT_URI'),
+],
+
+
 ];

@@ -1,3 +1,4 @@
+// src/App.tsx
 import React from "react";
 import {
   BrowserRouter as Router,
@@ -7,7 +8,7 @@ import {
 } from "react-router-dom";
 import { ConfigProvider } from "antd";
 import frFR from "antd/locale/fr_FR";
-
+import CandidatDashboard from './pages/candidat/CandidatDashboard';
 // 🎨 Layouts
 import Navbar from "./components/layout/Navbar";
 
@@ -21,16 +22,12 @@ import RegisterRh from "./pages/RegisterRh";
 import RegisterManager from "./pages/RegisterManager";
 import SocialCallback from "./pages/SocialCallback";
 import About from "./pages/About";
+import ApplyJobPage from "./pages/ApplyJobPage";
 
 // 📄 Pages RH
 import RhDashboard from "./pages/rh/RhDashboard";
 import RhJobsPage from "./pages/rh/RhJobsPage";
 import CandidatesPage from "./pages/rh/CandidatesPage";
-
-// 📄 Pages Candidat
-import CandidatDashboard from "./pages/candidat/CandidatDashboard";
-
-import ApplyJobPage from "./pages/candidat/ApplyJobPage";
 
 // 🔐 Auth service
 import { authService } from "./services/api";
@@ -51,9 +48,17 @@ function RhRoute({ children }: { children: React.ReactNode }) {
  */
 function CandidateRoute({ children }: { children: React.ReactNode }) {
   const user = authService.getCurrentUser();
-  if (!authService.isAuthenticated() || user?.role !== "candidat") {
-    return <Navigate to="/login" replace />;
+  
+  if (!authService.isAuthenticated() || user?.role !== 'candidat') {
+    return (
+      <Navigate 
+        to="/login" 
+        replace 
+        state={{ from: window.location.pathname }} // ✅ ex: /jobs/5/apply
+      />
+    );
   }
+  
   return <>{children}</>;
 }
 
@@ -70,25 +75,22 @@ const App: React.FC = () => {
     >
       <Router>
         <Routes>
+          
           {/* 🌍 ROUTES PUBLIQUES */}
+          <Route path="/" element={<><Navbar /><Home /></>} />
+          <Route path="/jobs" element={<><Navbar /><JobsPage /></>} />
+          
+          {/* ✅ ROUTE SPÉCIFIQUE /apply AVANT la route générique /:id */}
           <Route
-            path="/"
+            path="/jobs/:id/apply"
             element={
-              <>
-                <Navbar />
-                <Home />
-              </>
+              <CandidateRoute>
+                <ApplyJobPage />
+              </CandidateRoute>
             }
           />
-          <Route
-            path="/jobs"
-            element={
-              <>
-                <Navbar />
-                <JobsPage />
-              </>
-            }
-          />
+          
+          {/* ✅ Route générique /:id APRÈS (moins spécifique) */}
           <Route
             path="/jobs/:id"
             element={
@@ -98,16 +100,35 @@ const App: React.FC = () => {
               </>
             }
           />
+          
+          {/* ✅ Callback OAuth - PUBLIQUE */}
           <Route path="/social/callback" element={<SocialCallback />} />
-
+          
           {/* 🔐 AUTH & INSCRIPTION */}
           <Route path="/login/:role?" element={<Login />} />
           <Route path="/register" element={<RegisterCandidat />} />
           <Route path="/register/rh" element={<RegisterRh />} />
           <Route path="/register/manager" element={<RegisterManager />} />
 
+<Route
+  path="/candidat/dashboard"
+  element={
+    <CandidateRoute>
+      <CandidatDashboard />
+    </CandidateRoute>
+  }
+/>
+
+<Route
+  path="/candidat/applications"
+  element={
+    <CandidateRoute>
+      <CandidatDashboard />  {/* Ou créer une page dédiée ApplicationsList */}
+    </CandidateRoute>
+  }
+/>
+
           {/* 👤 ROUTES CANDIDAT (Protégées) */}
-          <Route path="/candidat/dashboard" element={<CandidatDashboard />} />
           <Route
             path="/candidat/applications"
             element={
@@ -116,44 +137,23 @@ const App: React.FC = () => {
               </CandidateRoute>
             }
           />
-          <Route
-            path="/jobs/:id/apply"
-            element={
-              <CandidateRoute>
-                <ApplyJobPage />
-              </CandidateRoute>
-            }
-          />
 
           {/* 👔 ROUTES RH (Protégées) */}
+          <Route path="/dashboard/rh" element={<RhRoute><RhDashboard /></RhRoute>} />
+          <Route path="/rh/jobs" element={<RhRoute><RhJobsPage /></RhRoute>} />
           <Route
-            path="/dashboard/rh"
+            path="/rh/candidates"  // ✅ Path exact qui correspond au Sidebar
             element={
-              <RhRoute>
-                <RhDashboard />
-              </RhRoute>
-            }
-          />
-          <Route
-            path="/rh/jobs"
-            element={
-              <RhRoute>
-                <RhJobsPage />
-              </RhRoute>
-            }
-          />
-          <Route
-            path="/rh/candidates"
-            element={
-              <RhRoute>
+              <RhRoute>  // ✅ Guard pour vérifier rôle RH
                 <CandidatesPage />
               </RhRoute>
             }
-          />
+          />          
           <Route path="/about" element={<About />} />
 
-          {/* Redirection par défaut si route inconnue */}
+          {/* 🔄 Redirection par défaut */}
           <Route path="*" element={<Navigate to="/" replace />} />
+          
         </Routes>
       </Router>
     </ConfigProvider>
