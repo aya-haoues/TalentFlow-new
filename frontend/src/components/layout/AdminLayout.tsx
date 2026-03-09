@@ -1,13 +1,14 @@
-// src/components/layout/CandidatLayout.tsx
+// src/components/layout/AdminLayout.tsx
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Layout, ConfigProvider, Typography, Space,
-  Avatar,  Dropdown, theme, message,
+  Avatar, Dropdown, theme, message,
 } from 'antd';
 import {
-  DashboardOutlined, SearchOutlined, FileDoneOutlined,
-  UserOutlined, DownOutlined, LogoutOutlined,
+  DashboardOutlined, TeamOutlined, BankOutlined,
+   DownOutlined, LogoutOutlined,
+  SafetyOutlined, CheckCircleOutlined,
 } from '@ant-design/icons';
 import { authService } from '../../services/api';
 import type { MenuItem, User } from '../../types';
@@ -16,30 +17,29 @@ import Sidebar from './Sidebar';
 const { Content, Header } = Layout;
 const { Text, Title } = Typography;
 
-const CANDIDAT_MENU_ITEMS: MenuItem[] = [
-  { key: 'dashboard',    label: 'Tableau de bord',    icon: <DashboardOutlined />, path: '/candidat/dashboard'    },
-  { key: 'jobs',         label: 'Explorer les offres', icon: <SearchOutlined />,   path: '/jobs'                  },
-  { key: 'applications', label: 'Mes candidatures',   icon: <FileDoneOutlined />,  path: '/candidat/applications' },
-  { key: 'profile',      label: 'Mon Profil / CV',    icon: <UserOutlined />,      path: '/candidat/profile'      },
+const ADMIN_MENU_ITEMS: MenuItem[] = [
+  { key: 'dashboard',   label: 'Dashboard',          icon: <DashboardOutlined />,   path: '/admin/dashboard'   },
+  { key: 'users',       label: 'Utilisateurs',        icon: <TeamOutlined />,        path: '/admin/users'       },
+  { key: 'departments', label: 'Départements',        icon: <BankOutlined />,        path: '/admin/departments' },
+  { key: 'approvals',   label: 'Comptes en attente',  icon: <CheckCircleOutlined />, path: '/admin/approvals'   },
 ];
 
 const SIDEBAR_WIDTH           = 260;
 const SIDEBAR_COLLAPSED_WIDTH = 80;
 
-interface CandidatLayoutProps {
+interface AdminLayoutProps {
   children:     React.ReactNode;
   title?:       string;
   description?: string;
-  actions?:     React.ReactNode;
 }
 
-export default function CandidatLayout({ children, title, description, actions }: CandidatLayoutProps) {
-  const navigate   = useNavigate();
+export default function AdminLayout({ children, title, description }: AdminLayoutProps) {
+  const navigate             = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const user = authService.getCurrentUser() as User;
 
   const { token }    = theme.useToken();
-  const primaryColor = token.colorPrimary     ?? '#00a89c';
+  const primaryColor = '#00a89c';
   const borderColor  = token.colorBorder      ?? '#f0f0f0';
   const bgContainer  = token.colorBgContainer ?? '#ffffff';
   const bgLayout     = token.colorBgLayout    ?? '#f5f5f5';
@@ -50,16 +50,14 @@ export default function CandidatLayout({ children, title, description, actions }
     try {
       await authService.logout();
       message.success('Déconnexion réussie');
-      navigate('/login');
+      navigate('/login/admin');
     } catch {
-      navigate('/login');
+      navigate('/login/admin');
     }
   };
 
   const userMenuItems = [
-    { key: 'profile', label: 'Mon profil',  icon: <UserOutlined />,  onClick: () => navigate('/candidat/profile') },
-    { type: 'divider' as const },
-    { key: 'logout',  label: 'Déconnexion', icon: <LogoutOutlined />, onClick: handleLogout, danger: true },
+    { key: 'logout', label: 'Déconnexion', icon: <LogoutOutlined />, onClick: handleLogout, danger: true },
   ];
 
   return (
@@ -69,7 +67,7 @@ export default function CandidatLayout({ children, title, description, actions }
         <Sidebar
           collapsed={collapsed}
           onCollapse={setCollapsed}
-          items={CANDIDAT_MENU_ITEMS}
+          items={ADMIN_MENU_ITEMS}
           user={user}
           primaryColor={primaryColor}
         />
@@ -82,13 +80,21 @@ export default function CandidatLayout({ children, title, description, actions }
             padding:        '0 24px',
             display:        'flex',
             alignItems:     'center',
-            justifyContent: 'flex-end',
+            justifyContent: 'space-between',
             position:       'sticky',
             top:            0,
             zIndex:         99,
             borderBottom:   `1px solid ${borderColor}`,
             height:         64,
           }}>
+            {/* Badge Admin */}
+            <Space>
+              <SafetyOutlined style={{ color: primaryColor, fontSize: 18 }} />
+              <Text strong style={{ color: primaryColor, fontSize: 14, textTransform: 'uppercase', letterSpacing: 1 }}>
+                Administration
+              </Text>
+            </Space>
+
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
               <Space style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: 8 }}>
                 <Avatar size={32} style={{ background: primaryColor, fontWeight: 600 }}>
@@ -99,7 +105,7 @@ export default function CandidatLayout({ children, title, description, actions }
                     {user?.name?.split(' ')[0]}
                   </Text>
                   <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase' }}>
-                    Candidat
+                    Admin
                   </Text>
                 </div>
                 <DownOutlined style={{ fontSize: 10, color: '#999' }} />
@@ -122,13 +128,6 @@ export default function CandidatLayout({ children, title, description, actions }
                 {description && <Text type="secondary" style={{ fontSize: 14 }}>{description}</Text>}
               </div>
             )}
-
-            {actions && (
-              <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'flex-end' }}>
-                {actions}
-              </div>
-            )}
-
             {children}
           </Content>
         </Layout>

@@ -1,71 +1,36 @@
 // src/components/layout/Sidebar.tsx
-import { useState } from 'react';
+// Sidebar générique — fonctionne pour RH, Candidat et Admin
+// Les items de menu sont passés en props par chaque Layout parent
+import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Layout, Menu, Avatar, Space, Typography, theme } from 'antd';
-import logo from '../../assets/comunik.jpg'; 
-
-import {
-  DashboardOutlined, FileTextOutlined, UsergroupAddOutlined,
-  SettingOutlined, TeamOutlined
-} from '@ant-design/icons';
-import { authService } from '../../services/api';
-import type { User, MenuItem, SidebarProps } from '../../types';
+import type { MenuItem, User } from '../../types';
+import logo from '../../assets/comunik.jpg';
 
 const { Sider } = Layout;
 const { Title, Text } = Typography;
 
+interface SidebarProps {
+  collapsed:     boolean;
+  onCollapse:    React.Dispatch<React.SetStateAction<boolean>>;
+  items:         MenuItem[];
+  user:          User;
+  primaryColor?: string;
+}
 
-const sidebarItems: MenuItem[] = [
-  { 
-    key: 'dashboard', 
-    label: 'Tableau de bord', 
-    icon: <DashboardOutlined />, 
-    path: '/dashboard/rh', 
-    description: 'Vue d\'ensemble' 
-  },
-  { 
-    key: 'jobs', 
-    label: 'Offres d\'emploi', 
-    icon: <FileTextOutlined />, 
-    path: '/rh/jobs', 
-    description: 'Gérer les offres'  
-  },
-  // Modifiez l'objet "applications" dans sidebarItems
-  { 
-    key: 'applications', 
-    label: 'Candidatures', 
-    icon: <UsergroupAddOutlined />, 
-    path: '/rh/candidates', // 👈 Changez '/rh/applications' en '/rh/candidates'
-    description: 'Gérer candidats' 
-  },
-  { 
-    key: 'departments', 
-    label: 'Départements', 
-    icon: <TeamOutlined />, 
-    path: '/rh/departments',  
-    description: 'Organisation' 
-  },
-  { 
-    key: 'settings', 
-    label: 'Paramètres', 
-    icon: <SettingOutlined />, 
-    path: '/rh/settings',  
-    description: 'Configuration' 
-  },
-];
-
-export default function Sidebar({ collapsed, onCollapse }: SidebarProps) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  
-  const [user] = useState<User | null>(() => authService.getCurrentUser());
-
+export default function Sidebar({
+  collapsed,
+  onCollapse,
+  items,
+  user,
+  primaryColor = '#00a89c',
+}: SidebarProps) {
+  const navigate  = useNavigate();
+  const location  = useLocation();
   const { token } = theme.useToken();
-  const primaryColor = token.colorPrimary ?? '#00a89c';
-  const borderColor = token.colorBorder ?? '#f0f0f0';
-  const bgContainer = token.colorBgContainer ?? '#ffffff';
 
-  
+  const borderColor = token.colorBorder      ?? '#f0f0f0';
+  const bgContainer = token.colorBgContainer ?? '#ffffff';
 
   return (
     <Sider
@@ -73,74 +38,76 @@ export default function Sidebar({ collapsed, onCollapse }: SidebarProps) {
       collapsed={collapsed}
       onCollapse={onCollapse}
       width={260}
+      collapsedWidth={80}
       theme="light"
       style={{
         borderRight: `1px solid ${borderColor}`,
-        position: 'fixed',
-        height: '100vh',
-        left: 0,
-        top: 0,
-        zIndex: 100,
-        overflow: 'auto'
+        position:    'fixed',
+        height:      '100vh',
+        left:        0,
+        top:         0,
+        zIndex:      100,
+        overflow:    'auto',
       }}
     >
       {/* Logo */}
-<div style={{
-  height: 64,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: collapsed ? 'center' : 'flex-start',
-  padding: '0 16px',
-  borderBottom: `1px solid ${borderColor}`
-}}>
-  <img src={logo} alt="TalentFlow" style={{ height: collapsed ? 32 : 40, width: 'auto' }} />
+      <div style={{
+        height:         64,
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        padding:        '0 16px',
+        borderBottom:   `1px solid ${borderColor}`,
+      }}>
+        <img
+          src={logo}
+          alt="TalentFlow"
+          style={{ height: collapsed ? 28 : 36, objectFit: 'contain', cursor: 'pointer' }}
+          onClick={() => navigate('/')}
+        />
+        {!collapsed && (
+          <Title level={4} style={{ margin: '0 0 0 10px', fontSize: 17, color: '#1a3636' }}>
+            TalentFlow
+          </Title>
+        )}
+      </div>
 
-  {!collapsed && (
-    <Title level={4} style={{ margin: '0 0 0 12px', fontSize: 18, color: '#1a3636' }}>
-      TalentFlow
-    </Title>
-  )}
-</div>
-
+      {/* Menu */}
       <Menu
         mode="inline"
         selectedKeys={[location.pathname]}
         style={{ borderRight: 0, marginTop: 8 }}
-        items={sidebarItems.map((item) => ({
-          key: item.path,
-          icon: item.icon,
+        items={items.map((item) => ({
+          key:   item.path,
+          icon:  item.icon,
           label: (
-            <div onClick={() => navigate(item.path)} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span>{item.label}</span>
-              {!collapsed && item.description && (
-                <Text type="secondary" style={{ fontSize: 11, marginLeft: 'auto' }}>
-                  {item.description}
-                </Text>
-              )}
-            </div>
+            <span onClick={() => navigate(item.path)}>
+              {item.label}
+            </span>
           ),
         }))}
       />
 
-      {!collapsed && user && (
+      {/* User info en bas — masqué si collapsed */}
+      {!collapsed && (
         <div style={{
-          position: 'absolute',
-          bottom: 0,
-          width: '100%',
-          padding: 16,
-          borderTop: `1px solid ${borderColor}`,
-          background: bgContainer
+          position:   'absolute',
+          bottom:     0,
+          width:      '100%',
+          padding:    '12px 16px',
+          borderTop:  `1px solid ${borderColor}`,
+          background: bgContainer,
         }}>
           <Space align="center">
-            <Avatar size={28} style={{ background: primaryColor, fontSize: 12 }}>
-              {user?.name?.charAt(0).toUpperCase()}
+            <Avatar size={28} style={{ background: primaryColor, fontSize: 12, fontWeight: 600 }}>
+              {user.name.charAt(0).toUpperCase()}
             </Avatar>
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ minWidth: 0 }}>
               <Text strong style={{ display: 'block', fontSize: 13 }}>
-                {user?.name}
+                {user.name}
               </Text>
               <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase' }}>
-                {user?.role}
+                {user.role}
               </Text>
             </div>
           </Space>

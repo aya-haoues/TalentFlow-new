@@ -6,12 +6,44 @@ use App\Http\Controllers\RhController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\ApplicationController;
+use App\Http\Controllers\CandidatController;
+use App\Http\Controllers\AdminController;
 
-Route::middleware('auth:sanctum')->get('/auth/profile', function (Request $request) {
-    $user = $request->user();
-    return response()->json(['success' => true, 'user' => $user]);
+
+
+Route::post('/login/admin', [AuthController::class, 'loginAdmin']);
+
+
+/* ═══════════════════════════════════════════════════════
+   🔐 ROUTES ADMIN (auth:sanctum + role:admin requis)
+   ═══════════════════════════════════════════════════════ */
+Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
+
+    // Stats globales
+    Route::get('/stats', [AdminController::class, 'stats']);
+
+    // Gestion utilisateurs
+    Route::get('/users',               [AdminController::class, 'index']);
+    Route::get('/users/pending',       [AdminController::class, 'pending']);
+    Route::post('/users/{id}/approve', [AdminController::class, 'approve']);
+    Route::post('/users/{id}/reject',  [AdminController::class, 'reject']);
+    Route::post('/users/{id}/toggle',  [AdminController::class, 'toggleBlock']);
+    Route::delete('/users/{id}',       [AdminController::class, 'destroy']);
+
+    // Gestion départements
+    Route::get('/departments',         [AdminController::class, 'departments']);
+    Route::post('/departments',        [AdminController::class, 'storeDepartment']);
+    Route::put('/departments/{id}',    [AdminController::class, 'updateDepartment']);
+    Route::delete('/departments/{id}', [AdminController::class, 'destroyDepartment']);
 });
 
+
+Route::middleware('auth:sanctum')->prefix('candidat')->group(function () {
+    Route::get('/profile',           [CandidatController::class, 'showProfile']);
+    Route::post('/profile',          [CandidatController::class, 'updateProfile']);
+    Route::get('/dashboard/stats',   [CandidatController::class, 'dashboardStats']);
+    Route::get('/applications',      [CandidatController::class, 'myApplications']);
+});
 
 Route::middleware('api')->group(function () {
     Route::post('/register/candidat', [AuthController::class, 'registerCandidat']);

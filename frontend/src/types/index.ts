@@ -1,356 +1,326 @@
+// src/types/index.ts
 import type { ReactNode } from 'react';
 
+/* ══════════════════════════════════════════════════════════
+   UNION TYPES — source unique, importés partout
+══════════════════════════════════════════════════════════ */
+export type UserRole         = 'candidat' | 'rh' | 'manager' | 'admin';
+export type ContractType     = 'CDI' | 'CDD' | 'Stage' | 'Alternance' | 'Freelance' | 'SIVP';
+export type ExperienceLevel  = 'junior' | 'confirme' | 'senior';
+export type WorkplaceType    = 'remote' | 'hybrid' | 'onsite';
+export type JobStatus        = 'brouillon' | 'publiee' | 'pausee' | 'archivee';
+export type ApplicationStatus = 'en_attente' | 'en_cours' | 'acceptee' | 'refusee' | 'retiree' | 'annulee';
+export type SkillLevel       = 'debutant' | 'intermediaire' | 'avance' | 'expert';
+export type Gender           = 'homme' | 'femme' | 'autre' | 'prefer_ne_pas_repondre';
+
+/* ══════════════════════════════════════════════════════════
+   ENTITÉS PRINCIPALES
+══════════════════════════════════════════════════════════ */
 export interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: 'candidat' | 'rh' | 'manager';
-  telephone?: string;
+  id:           number;
+  name:         string;
+  email:        string;
+  role:         UserRole;
+  telephone?:   string;
   linkedin_url?: string;
+  avatar?:      string;
+  cv_path?:     string;
 }
-
-export interface AuthResponse {
-  success: boolean;
-  message?: string;
-  access_token?: string;
-  token_type?: string;
-  user?: User;
-  redirect_url?: string; // 🔑 URL de redirection selon rôle
-  errors?: Record<string, string[]>;
-}
-
-export interface RegisterFormData {
-  name: string;
-  email: string;
-  password: string;
-  password_confirmation: string;
-  telephone?: string;
-  linkedin_url?: string;
-}
-
-export interface LoginFormData {
-  email: string;
-  password: string;
-}
-
 
 export interface Department {
-  id: number;
-  nom: string;
+  id:           number;
+  nom:          string;
   description?: string | null;
-  created_at?: string;
-  updated_at?: string;
+  created_at?:  string;
+  updated_at?:  string;
 }
 
 export interface Job {
-  id: number;
-  titre: string;
-  department_id: number;
-  department?: Department; // Optionnel : si tu fais un .load('department')
-  type_contrat: 'CDI' | 'CDD' | 'Stage' | 'Alternance' | 'Freelance';
-  niveau_experience: 'junior' | 'confirme' | 'senior';
-  type_lieu: 'remote' | 'hybrid' | 'onsite';
-  description: string;
-  competences_requises: string[];
-  statut: 'brouillon' | 'publiee' | 'pausee' | 'archivee';
-  nombre_postes: number;
-  date_limite?: string | null;
-  salaire_min?: number | null;
-  salaire_max?: number | null;
-  created_by: number;
-  created_at?: string;
-  updated_at?: string;
-  applications_count?: number;
-
+  id:                    number;
+  titre:                 string;
+  department_id:         number;
+  department?:           Department;
+  type_contrat:          ContractType;
+  niveau_experience:     ExperienceLevel;
+  type_lieu:             WorkplaceType;
+  description:           string;
+  competences_requises:  string[];
+  statut:                JobStatus;
+  nombre_postes:         number;
+  date_limite?:          string | null;
+  salaire_min?:          number | null;
+  salaire_max?:          number | null;
+  created_by:            number;
+  created_at?:           string;
+  updated_at?:           string;
+  applications_count?:   number;
+  entreprise?:           string;
 }
 
-// 🎯 Filtres pour la liste des offres
-export interface JobFilters {
-  statut?: 'brouillon' | 'publiee' | 'pausee' | 'archivee';
-  type_contrat?: 'CDI' | 'CDD' | 'Stage' | 'Alternance' | 'Freelance';
-  niveau_experience?: 'junior' | 'confirme' | 'senior';
-  type_lieu?: 'remote' | 'hybrid' | 'onsite';
-  department_id?: number;
-  search?: string;
-  page?: number;
-  per_page?: number;
-}
-
-export interface JobInput {
-  titre: string;
-  department_id: number;
-  type_contrat: 'CDI' | 'CDD' | 'Stage' | 'Alternance' | 'Freelance';
-  niveau_experience: 'junior' | 'confirme' | 'senior';
-  type_lieu: 'remote' | 'hybrid' | 'onsite';
-  description: string;
-  competences_requises: string[];
-  statut?: 'brouillon' | 'publiee' | 'pausee' | 'archivee';
-  nombre_postes?: number;
-  date_limite?: string | null;  // ← String 'YYYY-MM-DD' pour l'API
-  salaire_min?: number | null;
-  salaire_max?: number | null;
-}
-
-export interface RhLayoutProps {
-  title: string;
-  description?: string;
-  actions?: ReactNode;
-  children: ReactNode;
-}
-
-export interface MenuItem {
-  key: string;
-  label: string;
-  icon: React.ReactNode;
-  path: string;
-  description?: string;
-}
-
-export interface SidebarProps {
-  collapsed: boolean;
-  onCollapse: (collapsed: boolean) => void;
-}
-
-
-export interface JobFormProps {
-  /**
-   * Offre existante pour le mode édition.
-   * Si null ou undefined → mode création.
-   */
-  job?: Job | null;
-  
-  /**
-   * Callback appelé après création/mise à jour réussie.
-   * Responsable de fermer la modale et rafraîchir la liste.
-   */
-  onSuccess: () => void;
-  
-  /**
-   * Callback appelé si l'utilisateur annule.
-   * Responsable de fermer la modale sans sauvegarder.
-   */
-  onCancel: () => void;
-}
-
-/**
- * Valeurs du formulaire JobForm
- * Note : date_limite utilise dayjs.Dayjs pour le DatePicker Ant Design
- */
-export interface JobFormValues {
-  titre: string;
-  department_id: number;
-  type_contrat: 'CDI' | 'CDD' | 'Stage' | 'Alternance' | 'Freelance';
-  niveau_experience: 'junior' | 'confirme' | 'senior';
-  type_lieu: 'remote' | 'hybrid' | 'onsite';
-  description: string;
-  competences_requises: string[];
-  statut?: 'brouillon' | 'publiee' | 'pausee' | 'archivee';
-  nombre_postes?: number;
-  date_limite?: import('dayjs').Dayjs | null;  // ← Type Dayjs importé dynamiquement
-  salaire_min?: number | null;
-  salaire_max?: number | null;
-}
-
-
-// 🎯 Réponse standard de l'API Laravel
-export interface ApiResponse<T = unknown> {
-  success: boolean;
-  message?: string;
-  data: T;
-  pagination?: {
-    current_page: number;
-    last_page: number;
-    total: number;
-    per_page: number;
+export interface Application {
+  id:                      number;
+  job_id:                  number;
+  job?: {
+    id:          number;
+    titre:       string;
+    department?: { nom: string };
+    entreprise?: string;
   };
+  candidate_id:            number;
+  candidate?: {
+    id:         number;
+    name:       string;
+    email:      string;
+    telephone?: string;
+    avatar?:    string;
+  };
+  statut:                  ApplicationStatus;
+  cv_path?:                string;
+  cv_original_name?:       string;
+  why_us?:                 string;
+  motivation?:             string;        // alias why_us côté candidat
+  telephone?:              string;
+  linkedin_url?:           string;
+  contract_type_preferred?: ContractType;
+  ai_score?:               number;
+  date_candidature?:       string;        // alias created_at formaté
+  created_at:              string;
+  updated_at:              string;
 }
 
-
-// 📄 Réponse paginée (Laravel)
-export interface PaginatedResponse<T> {
-  data: T[];
-  current_page: number;
-  last_page: number;
-  total: number;
-  per_page: number;
+/* ══════════════════════════════════════════════════════════
+   AUTH
+══════════════════════════════════════════════════════════ */
+export interface AuthResponse {
+  success:        boolean;
+  message?:       string;
+  access_token?:  string;
+  token_type?:    string;
+  user?:          User;
+  redirect_url?:  string;
+  errors?:        Record<string, string[]>;
 }
 
+export interface RegisterFormData {
+  name:                  string;
+  email:                 string;
+  password:              string;
+  password_confirmation: string;
+  telephone?:            string;
+  linkedin_url?:         string;
+}
 
-// 📋 Type pour la liste des jobs
-export type JobsResponse = ApiResponse<Job[]>;
+export interface LoginFormData {
+  email:    string;
+  password: string;
+}
 
-// 🏢 Type pour la liste des départements
-export type DepartmentsResponse = ApiResponse<Department[]>;
+/* ══════════════════════════════════════════════════════════
+   INPUTS API
+══════════════════════════════════════════════════════════ */
+export interface JobInput {
+  titre:                 string;
+  department_id:         number;
+  type_contrat:          ContractType;
+  niveau_experience:     ExperienceLevel;
+  type_lieu:             WorkplaceType;
+  description:           string;
+  competences_requises:  string[];
+  statut?:               JobStatus;
+  nombre_postes?:        number;
+  date_limite?:          string | null;
+  salaire_min?:          number | null;
+  salaire_max?:          number | null;
+}
 
+export interface ApplicationInput {
+  job_id:                  number;
+  cv?:                     File | null;
+  contract_type_preferred: ContractType;
+  date_candidature?:       string;
+}
 
+/* ══════════════════════════════════════════════════════════
+   FORMULAIRES
+══════════════════════════════════════════════════════════ */
+export interface JobFormValues extends Omit<JobInput, 'date_limite'> {
+  date_limite?: import('dayjs').Dayjs | null;
+}
 
-// 📝 Données du formulaire de candidature
 export interface ApplicationFormValues {
   cv?: {
     fileList: Array<{
       originFileObj?: File;
-      name: string;
-      uid: string;
+      name:           string;
+      uid:            string;
     }>;
   };
-  why_us: string;
-  handicap?: string;
-  contract_type: 'CDI' | 'CDD' | 'SIVP' | 'Freelance';
-  
-  // Sections dynamiques (tableaux)
-  experiences?: Array<{
-    entreprise: string;
-    poste?: string;
-    dates?: [string, string];  // [start, end] ISO strings
-    secteur?: string;
-    pays?: string;
-  }>;
-  
-  formations?: Array<{
-    etablissement: string;
-    diplome?: string;
-    specialite?: string;
-    dates?: [string, string];
-  }>;
-  
-  skills?: Array<{
-    nom: string;
-    niveau?: 'debutant' | 'intermediaire' | 'avance' | 'expert';
-    annees?: number;
-    lien?: string;
-  }>;
-  
-  challenges?: Array<{
-    type?: string;
-    description?: string;
-    leçon?: string;
-  }>;
+  personal_info?:  PersonalInfoInput;
+  experiences?:    ExperienceInput[];
+  formations?:     FormationInput[];
+  skills?:         SkillInput[];
+  challenges?:     ChallengeInput[];
+  why_us:          string;
+  handicap?:       string;
+  contract_type:   ContractType;
 }
 
-
-
-// src/types/index.ts
-
-// 📋 Candidature à une offre
-export interface Application {
-  id: number;
-  job_id: number;
-  job?: { 
-    id: number;
-    titre: string; 
-    department?: { nom: string };
+/* ══════════════════════════════════════════════════════════
+   SOUS-TYPES FORMULAIRE CANDIDATURE
+══════════════════════════════════════════════════════════ */
+export interface PersonalInfoInput {
+  nom:              string;
+  prenom:           string;
+  email:            string;
+  telephone:        string;
+  date_naissance?:  string | Date | { format: (fmt: string) => string } | null;
+  adresse?: {
+    rue?:         string;
+    ville?:       string;
+    code_postal?: string;
+    pays?:        string;
   };
-  candidate_id: number;
-  cv_path?: string;
-  cv_original_name?: string;
-  lettre_motivation?: string;
-  telephone?: string;
-  linkedin_url?: string;
-  statut: 'en_attente' | 'acceptee' | 'refusee' | 'annulee';  // ✅ Union type
-  created_at: string;  // ISO date string
-  updated_at: string;
+  linkedin_url?:  string;
+  github_url?:    string;
+  site_web?:      string;
+  genre?:         Gender;
+  nationalite?:   string;
 }
 
-
-export interface ApplicationInput {
-  job_id: number;  // ✅ ID de l'offre visée (requis)
-  
-  // 📎 CV (géré via FormData pour l'upload)
-  cv?: File | null;  // ✅ Fichier binaire pour upload
-  contract_type_preferred: 'CDI' | 'CDD' | 'SIVP' | 'Freelance';  // ✅ Union type
-  
-  // 📅 Métadonnées (optionnelles, souvent générées côté backend)
-  date_candidature?: string;  // Format 'YYYY-MM-DD'
+export interface ExperienceInput {
+  entreprise:   string;
+  poste?:       string;
+  dates?:       [string, string];
+  secteur?:     string;
+  pays?:        string;
+  description?: string;
 }
 
+export interface FormationInput {
+  etablissement: string;
+  diplome?:      string;
+  specialite?:   string;
+  dates?:        [string, string];
+  description?:  string;
+}
 
+export interface SkillInput {
+  nom:     string;
+  niveau?: SkillLevel;
+  annees?: number | null;
+  lien?:   string;
+}
 
-// src/types/index.ts
+export interface ChallengeInput {
+  type?:        string;
+  description?: string;
+  lecon?:       string;   // ✅ sans accent — évite les bugs d'encoding JSON
+}
 
-// 📎 Fichier uploadé (Ant Design Upload)
+/* ══════════════════════════════════════════════════════════
+   UPLOAD
+══════════════════════════════════════════════════════════ */
 export interface UploadedFile {
-  uid: string;
-  name: string;
-  status: 'done' | 'uploading' | 'error' | 'removed';
-  url?: string;
-  originFileObj?: File;  // ✅ Important : le fichier brut
+  uid:             string;
+  name:            string;
+  status:          'done' | 'uploading' | 'error' | 'removed';
+  url?:            string;
+  originFileObj?:  File;
 }
 
 export interface UploadField {
   fileList: UploadedFile[];
 }
 
-// 💼 Expérience professionnelle
-export interface ExperienceInput {
-  entreprise: string;
-  poste?: string;
-  dates?: [string, string];
-  secteur?: string;
-  pays?: string;
-  description?: string;
+/* ══════════════════════════════════════════════════════════
+   STATS
+══════════════════════════════════════════════════════════ */
+export interface CandidatStats {
+  total:               number;
+  en_attente:          number;
+  en_cours:            number;
+  acceptee:            number;
+  profile_completion?: number;
 }
 
-// 🎓 Formation
-export interface FormationInput {
-  etablissement: string;
-  diplome?: string;
-  specialite?: string;
-  dates?: [string, string];
-  description?: string;
+export interface RhStats {
+  total_applications: number;
+  en_attente:         number;
+  en_cours:           number;
+  acceptee:           number;
+  refusee:            number;
+  new_this_week:      number;
+  total_jobs_active:  number;
 }
 
-// 🛠️ Compétence
-export interface SkillInput {
-  nom: string;
-  niveau?: 'debutant' | 'intermediaire' | 'avance' | 'expert';
-  annees?: number | null;
-  lien?: string;
+/* ══════════════════════════════════════════════════════════
+   FILTRES
+══════════════════════════════════════════════════════════ */
+export interface JobFilters {
+  statut?:            JobStatus;
+  type_contrat?:      ContractType;
+  niveau_experience?: ExperienceLevel;
+  type_lieu?:         WorkplaceType;
+  department_id?:     number;
+  search?:            string;
+  page?:              number;
+  per_page?:          number;
 }
 
-// 🎯 Défi professionnel
-export interface ChallengeInput {
-  type?: string;
-  description?: string;
-  leçon?: string;
-}
-
-// src/types/index.ts
-
-export interface PersonalInfoInput {
-  nom: string;
-  prenom: string;
-  email: string;
-  telephone: string;
-  
-  // ✅ Typage flexible pour compatibilité avec DatePicker (Moment/Dayjs)
-  date_naissance?: string | Date | { format: (fmt: string) => string } | null;
-  
-  adresse?: {
-    rue?: string;
-    ville?: string;
-    code_postal?: string;
-    pays?: string;
+/* ══════════════════════════════════════════════════════════
+   RÉPONSES API
+══════════════════════════════════════════════════════════ */
+export interface ApiResponse<T = unknown> {
+  success:     boolean;
+  message?:    string;
+  data:        T;
+  pagination?: {
+    current_page: number;
+    last_page:    number;
+    total:        number;
+    per_page:     number;
   };
-  linkedin_url?: string;
-  github_url?: string;
-  site_web?: string;
-  genre?: 'homme' | 'femme' | 'autre' | 'prefer_ne_pas_repondre';
-  nationalite?: string;
 }
 
-// 📋 Mettre à jour ApplicationFormValues pour inclure personal_info
-export interface ApplicationFormValues {
-  cv?: UploadField;
-  
-  // ✅ NOUVEAU : Informations personnelles
-  personal_info?: PersonalInfoInput;
-  
-  experiences?: ExperienceInput[];
-  formations?: FormationInput[];
-  skills?: SkillInput[];
-  challenges?: ChallengeInput[];
-  
-  why_us: string;
-  handicap?: string;
-  contract_type: 'CDI' | 'CDD' | 'SIVP' | 'Freelance' | 'Alternance';
+export interface PaginatedResponse<T> {
+  data:         T[];
+  current_page: number;
+  last_page:    number;
+  total:        number;
+  per_page:     number;
+}
+
+export type JobsResponse        = ApiResponse<Job[]>;
+export type DepartmentsResponse = ApiResponse<Department[]>;
+export type ApplicationsResponse = ApiResponse<Application[]>;
+
+/* ══════════════════════════════════════════════════════════
+   PROPS LAYOUT
+══════════════════════════════════════════════════════════ */
+export interface RhLayoutProps {
+  title:        string;
+  description?: string;
+  actions?:     ReactNode;
+  children:     ReactNode;
+}
+
+export interface AdminLayoutProps {
+  title:        string;
+  description?: string;
+  actions?:     ReactNode;
+  children:     ReactNode;
+}
+
+export interface MenuItem {
+  key:          string;
+  label:        string;
+  icon:         ReactNode;
+  path:         string;
+  description?: string;
+}
+
+export interface JobFormProps {
+  job?:       Job | null;
+  onSuccess:  () => void;
+  onCancel:   () => void;
 }

@@ -1,202 +1,189 @@
-// src/pages/Login.tsx
-import React, { useState } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+// src/pages/public/Login.tsx
+// Page de connexion unifiée — candidat, rh, manager, admin
+// Route : /login/:role?  (défaut = candidat)
+import { useState } from 'react';
+import { useNavigate, useLocation, useParams, Link } from 'react-router-dom';
 import { Form, Input, Button, Typography, Divider, Alert, message } from 'antd';
-import { UserOutlined, LockOutlined, GoogleOutlined, LinkedinOutlined } from '@ant-design/icons';
+import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { authService } from '../services/api';
-import type { LoginFormData } from '../types';  // ✅ Import des types
-import { useParams } from 'react-router-dom';
-
+import SocialButtons from '../components/ui/SocialButtons';
+import type { LoginFormData } from '../types';
 
 const { Title, Text } = Typography;
 
+/* ── Type strict pour loginType ─────────────────────────── */
+type LoginType = 'default' | 'rh' | 'manager' | 'admin';
+type Role      = 'candidat' | 'rh' | 'manager' | 'admin';
+
+const ROLE_CONFIG: Record<Role, {
+  title:        string;
+  subtitle:     string;
+  color:        string;
+  redirectTo:   string;
+  showSocial:   boolean;
+  registerPath: string;
+  loginType:    LoginType;   // ✅ type strict, plus string
+}> = {
+  candidat: {
+    title:        'TalentFlow',
+    subtitle:     'Accédez à votre espace candidat',
+    color:        '#00a89c',
+    redirectTo:   '/candidat/dashboard',
+    showSocial:   true,
+    registerPath: '/register',
+    loginType:    'default',
+  },
+  rh: {
+    title:        'TalentFlow — RH',
+    subtitle:     'Espace Responsable RH',
+    color:        '#00a89c',
+    redirectTo:   '/rh/dashboard',
+    showSocial:   false,
+    registerPath: '/register/rh',
+    loginType:    'rh',
+  },
+  manager: {
+    title:        'TalentFlow — Manager',
+    subtitle:     'Espace Manager',
+    color:        '#00a89c',
+    redirectTo:   '/dashboard/manager',
+    showSocial:   false,
+    registerPath: '/register/manager',
+    loginType:    'manager',
+  },
+  admin: {
+    title:        'TalentFlow — Admin',
+    subtitle:     'Espace Administrateur',
+    color:        '#00a89c',
+    redirectTo:   '/admin/dashboard',
+    showSocial:   false,
+    registerPath: '/register/admin',
+    loginType:    'admin',
+  },
+};
+
 export default function Login() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { role } = useParams<{ role?: string }>(); // ✅ dans le composant
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const { role = 'candidat' } = useParams<{ role?: string }>();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error,   setError]   = useState<string | null>(null);
 
-  
+  const currentRole = (Object.keys(ROLE_CONFIG).includes(role) ? role : 'candidat') as Role;
+  const cfg         = ROLE_CONFIG[currentRole];
 
-const handleGoogleLogin = () => {
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-  
-  // ✅ Récupérer 'from' depuis location.state OU l'URL actuelle
-  const from = (location.state as { from?: string })?.from 
-               || sessionStorage.getItem('oauth_from');
-  
-  let redirectUrl = `${apiUrl}/auth/google/redirect`;
-  
-  if (from) {
-    sessionStorage.setItem('oauth_from', from); // fallback
-    redirectUrl += `?from=${encodeURIComponent(from)}`;
-  }
-  
-  window.location.href = redirectUrl;
-};
 
-const handleLinkedInLogin = () => {
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-  
-  const from = (location.state as { from?: string })?.from 
-               || sessionStorage.getItem('oauth_from');
-  
-  let redirectUrl = `${apiUrl}/auth/linkedin/redirect`;
-  
-  if (from) {
-    sessionStorage.setItem('oauth_from', from);
-    redirectUrl += `?from=${encodeURIComponent(from)}`;
-  }
-  
-  window.location.href = redirectUrl;
-};
-
-  // ✅ Fonction de connexion email/password - TYPÉE
+  /* ── Submit ─────────────────────────────────────────────── */
   const onFinish = async (values: LoginFormData) => {
     setLoading(true);
     setError(null);
-    
     try {
-      const loginType = role === 'rh' ? 'rh' : role === 'manager' ? 'manager' : 'default';
-      await authService.login(values, loginType); // ✅ utilisé ici, plus d'avertissement
-      
+      await authService.login(values, cfg.loginType); // ✅ LoginType strict
+
       const from = (location.state as { from?: string })?.from;
-      if (from) {
-        navigate(from, { replace: true, state: {} });
-      } else {
-        const user = authService.getCurrentUser();
-        if (user?.role === 'rh') navigate('/dashboard/rh');
-        else if (user?.role === 'manager') navigate('/dashboard/manager');
-        else navigate('/candidat/dashboard');
-      }
-      
+      navigate(from ?? cfg.redirectTo, { replace: true, state: {} });
       message.success('Connexion réussie !');
-      
     } catch (err: unknown) {
-      let errorMessage = 'Échec de la connexion';
-      if (err && typeof err === 'object' && 'response' in err) {
-        const axiosError = err as { response?: { data?: { message?: string } } };
-        errorMessage = axiosError.response?.data?.message || 'Échec de la connexion';
-      }
-      setError(errorMessage);
-      message.error(errorMessage);
+      const msg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : null;
+      const errorMsg = msg || 'Email ou mot de passe incorrect';
+      setError(errorMsg);
+      message.error(errorMsg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      display: 'flex', 
-      alignItems: 'center', 
+    <div style={{
+      minHeight:      '100vh',
+      display:        'flex',
+      alignItems:     'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #e6fffb 0%, #f0fdfa 100%)',
-      padding: '20px'
+      background:     'linear-gradient(135deg, #e6fffb 0%, #f0fdfa 100%)',
+      padding:        20,
     }}>
-      <div style={{ 
-        width: '100%', 
-        maxWidth: 420, 
-        background: '#fff', 
-        padding: '40px', 
+      <div style={{
+        width:        '100%',
+        maxWidth:     420,
+        background:   '#fff',
+        padding:      40,
         borderRadius: 16,
-        boxShadow: '0 8px 32px rgba(0, 168, 156, 0.1)'
+        boxShadow:    `0 8px 32px ${cfg.color}22`,
       }}>
-        <Title level={2} style={{ textAlign: 'center', color: '#004d4a', marginBottom: 8 }}>
-          Connexion
-        </Title>
-        <Text type="secondary" style={{ display: 'block', textAlign: 'center', marginBottom: 24 }}>
-          Accédez à votre espace TalentFlow
-        </Text>
 
-        {error && <Alert title="Erreur" description={error} type="error" showIcon style={{ marginBottom: 16 }} />}
+        {/* ── Header ── */}
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          {currentRole !== 'candidat' && (
+            <div style={{
+              display:         'inline-block',
+              padding:         '2px 14px',
+              borderRadius:    20,
+              backgroundColor: `${cfg.color}18`,
+              color:           cfg.color,
+              fontSize:        12,
+              fontWeight:      600,
+              textTransform:   'uppercase',
+              letterSpacing:   1,
+              marginBottom:    10,
+            }}>
+              {currentRole}
+            </div>
+          )}
+          <Title level={2} style={{ margin: '0 0 4px', color: cfg.color }}>
+            {cfg.title}
+          </Title>
+          <Text type="secondary">{cfg.subtitle}</Text>
+        </div>
 
-        {/* Formulaire email/password */}
+        {error && (
+          <Alert description={error} type="error" showIcon style={{ marginBottom: 16 }} />
+        )}
+
+        {/* ── Formulaire ── */}
         <Form name="login" onFinish={onFinish} layout="vertical" size="large">
-          <Form.Item
-            name="email"
-            rules={[{ required: true, message: 'Email requis' }, { type: 'email', message: 'Email invalide' }]}
-          >
+          <Form.Item name="email" rules={[
+            { required: true, message: 'Email requis' },
+            { type: 'email', message: 'Email invalide' },
+          ]}>
             <Input prefix={<UserOutlined />} placeholder="Email" />
           </Form.Item>
 
-          <Form.Item
-            name="password"
-            rules={[{ required: true, message: 'Mot de passe requis' }]}
-          >
+          <Form.Item name="password" rules={[
+            { required: true, message: 'Mot de passe requis' },
+          ]}>
             <Input.Password prefix={<LockOutlined />} placeholder="Mot de passe" />
           </Form.Item>
 
-          <Form.Item>
-            <Button 
-              type="primary" 
-              htmlType="submit" 
-              block 
-              loading={loading}
-              style={{ 
-                backgroundColor: '#00a89c', 
-                borderColor: '#00a89c',
-                height: 44,
-                fontWeight: 500
-              }}
+          <Form.Item style={{ marginBottom: 8 }}>
+            <Button
+              type="primary" htmlType="submit"
+              block loading={loading}
+              style={{ backgroundColor: cfg.color, borderColor: cfg.color, height: 44, fontWeight: 500 }}
             >
               Se connecter
             </Button>
           </Form.Item>
         </Form>
 
-        {/* ✅ SÉPARATEUR */}
-        <Divider style={{ margin: '24px 0' }}>ou continuer avec</Divider>
+        {/* ── Boutons sociaux — candidat uniquement ── */}
+        {cfg.showSocial && (
+          <SocialButtons mode="login" />
+        )}
 
-        {/* ✅ BOUTONS SOCIAUX - onClick attaché aux fonctions */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          
-          {/* 🔵 Bouton Google */}
-          <Button
-            block
-            size="large"
-            icon={<GoogleOutlined style={{ color: '#DB4437', fontSize: 18 }} />}
-            onClick={handleGoogleLogin}
-            style={{ 
-              height: 44,
-              border: '1px solid #dadce0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 500
-            }}
-          >
-            Continuer avec Google
-          </Button>
-
-          {/* 🔷 Bouton LinkedIn */}
-          <Button
-            block
-            size="large"
-            icon={<LinkedinOutlined style={{ color: '#0A66C2', fontSize: 18 }} />}
-            onClick={handleLinkedInLogin}
-            style={{ 
-              height: 44,
-              border: '1px solid #dadce0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 500
-            }}
-          >
-            Continuer avec LinkedIn
-          </Button>
-          
-        </div>
-
-        {/* Lien vers inscription */}
-        <div style={{ textAlign: 'center', marginTop: 24 }}>
+        {/* ── Footer ── */}
+        <Divider style={{ margin: '20px 0' }} />
+        <div style={{ textAlign: 'center' }}>
           <Text type="secondary">
             Pas encore de compte ?{' '}
-            <Link to="/register">S'inscrire gratuitement</Link>
+            <Link to={cfg.registerPath} style={{ color: cfg.color, fontWeight: 600 }}>
+              S'inscrire
+            </Link>
           </Text>
         </div>
+
       </div>
     </div>
   );

@@ -1,170 +1,130 @@
-// src/pages/rh/JobsPage.tsx - Interface RH de gestion des offres
+// src/pages/rh/RhJobsPage.tsx
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { 
+import {
   Button, Card, List, Tag, Space, Typography, Input, theme,
-  Modal as AntModal, Spin, Empty, Divider, Alert, message 
+  Modal, Spin, Empty, Divider, message,
 } from 'antd';
-import { 
-  PlusOutlined, SearchOutlined, EditOutlined, 
-  DeleteOutlined, FileTextOutlined
+import {
+  PlusOutlined, SearchOutlined, EditOutlined,
+  DeleteOutlined, FileTextOutlined,
 } from '@ant-design/icons';
-import api from '../../services/api';  // ← ../../ car dans pages/rh/
-import { useModal } from '../../hooks/useModal';  // ← ../../
-import JobForm from '../../components/jobs/JobForm';  // ← ../../
-import RhLayout from '../../components/layout/RhLayout';  // ← ../../
-import type { Job } from '../../types';  // ou '../../types/index'
-
+import api from '../../services/api';
+import { useModal } from '../../hooks/useModal';
+import JobForm from '../../components/jobs/JobForm';
+import RhLayout from '../../components/layout/RhLayout';
+import type { Job, JobStatus } from '../../types';
 
 const { Text, Title } = Typography;
 
-export default function RhJobsPage() {
-  const { token } = theme.useToken();
-  const jobModal = useModal<Job>();
-  const [searchParams] = useSearchParams();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
+const STATUS_CONFIG: Record<JobStatus, { color: string; label: string }> = {
+  publiee:   { color: 'success', label: 'Publiée'   },
+  brouillon: { color: 'default', label: 'Brouillon' },
+  pausee:    { color: 'warning', label: 'En pause'   },
+  archivee:  { color: 'processing', label: 'Archivée' },
+};
 
-  // 🔄 Charger TOUTES les offres RH depuis l'API
+export default function RhJobsPage() {
+  const { token }          = theme.useToken();
+  const navigate           = useNavigate();
+  const [searchParams]     = useSearchParams();
+  const jobModal           = useModal<Job>();
+
+  const [jobs, setJobs]           = useState<Job[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [searchQuery, setQuery]   = useState('');
+
+  /* ── Chargement ─────────────────────────────────────── */
   const fetchJobs = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError(null);
-      
-      // ✅ Appel à l'API protégée RH - retourne TOUTES les offres du RH
-      const response = await api.get('/rh/jobs');
-      
-      let jobsData: Job[] = [];
-      if (response.data?.success) {
-        if (Array.isArray(response.data.data)) {
-          jobsData = response.data.data;
-        } else if (Array.isArray(response.data.data?.data)) {
-          jobsData = response.data.data.data;
-        }
-      } else if (Array.isArray(response.data)) {
-        jobsData = response.data;
+      const res = await api.get('/rh/jobs');
+      if (res.data?.success) {
+        const raw = res.data.data;
+        setJobs(Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : []);
       }
-      
-      setJobs(jobsData);
-      
-      // Cache localStorage pour affichage instantané
-      if (jobsData.length > 0) {
-        localStorage.setItem('rh_jobs_cache', JSON.stringify(jobsData));
-        localStorage.setItem('rh_jobs_cache_time', Date.now().toString());
-      }
-      
     } catch (err: any) {
-      const errorMsg = err?.response?.data?.message || err?.message || 'Erreur de chargement';
-      setError(errorMsg);
-      message.error(errorMsg);
-      
-      // 🔐 Si 401 → token invalide → redirect login
-      if (err?.response?.status === 401) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('user');
-        navigate('/login');
-      }
+      message.error(err?.response?.data?.message ?? 'Erreur de chargement');
+      if (err?.response?.status === 401) navigate('/login');
     } finally {
       setLoading(false);
     }
   };
 
-  // 🚀 Initialisation du composant
   useEffect(() => {
-    // Vérifier authentification
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-      navigate('/login');
-      return;
-    }
-    
-    // Afficher depuis le cache d'abord (instantané)
-    const cached = localStorage.getItem('rh_jobs_cache');
-    const cachedTime = localStorage.getItem('rh_jobs_cache_time');
-    if (cached && cachedTime) {
-      const age = Date.now() - parseInt(cachedTime);
-      if (age < 5 * 60 * 1000) {  // Cache valide 5 minutes
-        setJobs(JSON.parse(cached));
-        setLoading(false);
-      }
-    }
-    
-    // Charger depuis l'API en arrière-plan
     fetchJobs();
-    
-    // Ouvrir modale si ?action=create dans l'URL
-    if (searchParams.get('action') === 'create') {
-      jobModal.open();
-    }
+    if (searchParams.get('action') === 'create') jobModal.open();
   }, []);
 
-  // 🗑️ Supprimer une offre
-  const handleDelete = async (id: number) => {
-    if (window.confirm('Supprimer cette offre ?')) {
-      try {
-        await api.delete(`/rh/jobs/${id}`);
-        setJobs(prev => prev.filter(job => job.id !== id));
-        message.success('Offre supprimée');
-      } catch (err: any) {
-        message.error(err?.response?.data?.message || 'Erreur lors de la suppression');
-      }
-    }
+  /* ── Suppression ────────────────────────────────────── */
+  const handleDelete = (job: Job) => {
+    Modal.confirm({
+      title:   `Supprimer "${job.titre}" ?`,
+      content: 'Cette action est irréversible.',
+      okText:       'Supprimer',
+      cancelText:   'Annuler',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await api.delete(`/rh/jobs/${job.id}`);
+          setJobs((prev) => prev.filter((j) => j.id !== job.id));
+          message.success('Offre supprimée');
+        } catch (err: any) {
+          message.error(err?.response?.data?.message ?? 'Erreur lors de la suppression');
+        }
+      },
+    });
   };
 
-  // ✅ Callback après succès du formulaire (création ou modification)
+  /* ── Après succès du formulaire ─────────────────────── */
   const handleFormSuccess = () => {
     jobModal.close();
-    fetchJobs();  // Recharger la liste
+    fetchJobs();
     if (searchParams.get('action') === 'create') {
-      navigate('/rh/jobs', { replace: true });  // Nettoyer l'URL
+      navigate('/rh/jobs', { replace: true });
     }
   };
 
-  // 🔍 Filtrage local (recherche en temps réel)
-  const filteredJobs = jobs.filter((job: Job) => {
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return true;
-    return (
-      job.titre?.toLowerCase().includes(query) ||
-      job.department?.nom?.toLowerCase().includes(query) ||
-      job.type_contrat?.toLowerCase().includes(query) ||
-      job.description?.toLowerCase().includes(query)
-    );
-  });
-
-  // 🎨 Config des statuts avec couleurs
-  const statusConfig: Record<string, { color: string; label: string }> = {
-    publiee: { color: 'success', label: 'Publiée' },
-    brouillon: { color: 'default', label: 'Brouillon' },
-    pausee: { color: 'warning', label: 'En pause' },
-    archivee: { color: 'processing', label: 'Archivée' }
+  const handleModalClose = () => {
+    jobModal.close();
+    if (searchParams.get('action') === 'create') navigate('/rh/jobs', { replace: true });
   };
 
-  const smallTagStyle: React.CSSProperties = { fontSize: 11, padding: '2px 8px' };
+  /* ── Filtrage local ─────────────────────────────────── */
+  const filtered = jobs.filter((job) => {
+    const q = searchQuery.toLowerCase();
+    return !q
+      || job.titre?.toLowerCase().includes(q)
+      || job.department?.nom?.toLowerCase().includes(q)
+      || job.type_contrat?.toLowerCase().includes(q);
+  });
+
+  /* ── Stats rapides ──────────────────────────────────── */
+  const quickStats = [
+    { label: 'Total',        value: jobs.length,                                              color: token.colorPrimary },
+    { label: 'Publiées',     value: jobs.filter((j) => j.statut === 'publiee').length,        color: '#52c41a'          },
+    { label: 'Brouillons',   value: jobs.filter((j) => j.statut === 'brouillon').length,      color: '#faad14'          },
+    { label: 'Candidatures', value: jobs.reduce((acc, j) => acc + (j.applications_count ?? 0), 0), color: '#722ed1'    },
+  ];
 
   return (
     <RhLayout
-      title="🎯 Gestion des Offres"
+      title="Gestion des Offres"
       description="Créer, modifier et suivre vos offres d'emploi"
-      // ✅ Actions groupées : barre de recherche + boutons
       actions={
         <Space>
-          <Input.Search
-            placeholder="Rechercher par titre, département, type de contrat..."
+          <Input
+            placeholder="Rechercher par titre, département, contrat..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ width: 300 }}
-            prefix={<SearchOutlined style={{ color: 'rgba(0,0,0,0.25)' }} />}
+            onChange={(e) => setQuery(e.target.value)}
+            prefix={<SearchOutlined />}
+            style={{ width: 280 }}
             allowClear
           />
-          
-          <Button 
-            type="primary" 
-            icon={<PlusOutlined />} 
-            onClick={() => jobModal.open()}   // ← ouvre directement la modale
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => jobModal.open()}
             style={{ backgroundColor: token.colorPrimary, borderColor: token.colorPrimary }}
           >
             Nouvelle offre
@@ -172,68 +132,34 @@ export default function RhJobsPage() {
         </Space>
       }
     >
-      {/* Indicateur de résultats si recherche active */}
-      {searchQuery && (
-        <div style={{ marginBottom: 16 }}>
-          <Text type="secondary">
-            {filteredJobs.length} résultat{filteredJobs.length > 1 ? 's' : ''} pour "{searchQuery}"
-          </Text>
-        </div>
-      )}
-
-      {/* 📊 Stats rapides */}
+      {/* Stats rapides */}
       <Space style={{ marginBottom: 24, flexWrap: 'wrap' }} size={16}>
-        <Card size="small" style={{ borderRadius: 8, minWidth: 110 }}>
-          <Text type="secondary">Total</Text><br />
-          <Title level={4} style={{ margin: 0, color: token.colorPrimary }}>{jobs.length}</Title>
-        </Card>
-        <Card size="small" style={{ borderRadius: 8, minWidth: 110 }}>
-          <Text type="secondary">Publiées</Text><br />
-          <Title level={4} style={{ margin: 0, color: '#52c41a' }}>
-            {jobs.filter(j => j.statut === 'publiee').length}
-          </Title>
-        </Card>
-        <Card size="small" style={{ borderRadius: 8, minWidth: 110 }}>
-          <Text type="secondary">Brouillons</Text><br />
-          <Title level={4} style={{ margin: 0, color: '#faad14' }}>
-            {jobs.filter(j => j.statut === 'brouillon').length}
-          </Title>
-        </Card>
-        <Card size="small" style={{ borderRadius: 8, minWidth: 110 }}>
-          <Text type="secondary">Candidatures</Text><br />
-          <Title level={4} style={{ margin: 0, color: '#722ed1' }}>
-            {jobs.reduce((acc, j) => acc + (j.applications_count || 0), 0)}
-          </Title>
-        </Card>
+        {quickStats.map((s) => (
+          <Card key={s.label} size="small" style={{ borderRadius: 8, minWidth: 110 }}>
+            <Text type="secondary">{s.label}</Text>
+            <Title level={4} style={{ margin: 0, color: s.color }}>{s.value}</Title>
+          </Card>
+        ))}
       </Space>
 
-      <Divider style={{ margin: '16px 0' }} />
+      {searchQuery && (
+        <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+          {filtered.length} résultat{filtered.length > 1 ? 's' : ''} pour « {searchQuery} »
+        </Text>
+      )}
 
-      {/* 📋 Liste des offres - AFFICHE TOUTES LES OFFRES RH */}
-      {loading && jobs.length === 0 ? (
+      <Divider style={{ margin: '8px 0 16px' }} />
+
+      {/* Liste */}
+      {loading ? (
         <div style={{ textAlign: 'center', padding: 60 }}>
-          <Spin size="large" description="Chargement des offres..." />
+          <Spin size="large" />
         </div>
-      ) : error ? (
-        <Alert 
-          message="❌ Erreur de chargement" 
-          description={error} 
-          type="error" 
-          showIcon
-          action={<Button size="small" onClick={fetchJobs}>Réessayer</Button>}
-        />
-      ) : filteredJobs.length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: 60 }}>
-          <Empty 
-            description={searchQuery ? `Aucune offre pour "${searchQuery}"` : 'Aucune offre'} 
-          />
+      ) : filtered.length === 0 ? (
+        <Card style={{ textAlign: 'center', padding: 40 }}>
+          <Empty description={searchQuery ? `Aucune offre pour « ${searchQuery} »` : 'Aucune offre'} />
           {!searchQuery && (
-            <Button 
-              type="primary" 
-              icon={<PlusOutlined />} 
-              onClick={() => jobModal.open()}
-              style={{ marginTop: 16 }}
-            >
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => jobModal.open()} style={{ marginTop: 16 }}>
               Créer la première offre
             </Button>
           )}
@@ -241,103 +167,57 @@ export default function RhJobsPage() {
       ) : (
         <List
           itemLayout="horizontal"
-          dataSource={filteredJobs}
+          dataSource={filtered}
           renderItem={(job: Job) => {
-            const status = statusConfig[job.statut] || statusConfig.brouillon;
+            const status = STATUS_CONFIG[job.statut] ?? STATUS_CONFIG.brouillon;
             return (
               <List.Item
+                style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}
                 actions={[
-                  // ✏️ Modifier
-                  <Button 
-                    key="edit" 
-                    type="text" 
-                    icon={<EditOutlined />} 
-                    size="small" 
-                    onClick={() => jobModal.open(job)}
-                  >
+                  <Button key="edit" type="text" icon={<EditOutlined />} size="small"
+                    onClick={() => jobModal.open(job)}>
                     Modifier
                   </Button>,
-                  // 🗑️ Supprimer
-                  <Button 
-                    key="delete" 
-                    type="text" 
-                    danger
-                    icon={<DeleteOutlined />} 
-                    size="small"
-                    onClick={() => handleDelete(job.id)}
-                  >
+                  <Button key="delete" type="text" danger icon={<DeleteOutlined />} size="small"
+                    onClick={() => handleDelete(job)}>
                     Supprimer
                   </Button>,
                 ]}
-                style={{ 
-                  padding: '16px 24px', 
-                  borderBottom: '1px solid #f0f0f0', 
-                  cursor: 'pointer',
-                  transition: 'background 0.2s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#fafafa'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
               >
                 <List.Item.Meta
                   avatar={
-                    <div style={{ 
-                      width: 48, height: 48, borderRadius: 8, 
-                      background: token.colorPrimary + '20',
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center' 
+                    <div style={{
+                      width: 48, height: 48, borderRadius: 8,
+                      background: `${token.colorPrimary}20`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                      <FileTextOutlined style={{ color: token.colorPrimary, fontSize: 24 }} />
+                      <FileTextOutlined style={{ color: token.colorPrimary, fontSize: 22 }} />
                     </div>
                   }
                   title={
-                    <Space align="center" style={{ flexWrap: 'wrap', gap: 8 }}>
-                      <Text strong style={{ fontSize: 16 }}>{job.titre}</Text>
-                      <Tag color={status.color} style={smallTagStyle}>{status.label}</Tag>
+                    <Space>
+                      <Text strong style={{ fontSize: 15 }}>{job.titre}</Text>
+                      <Tag color={status.color} style={{ fontSize: 11 }}>{status.label}</Tag>
                     </Space>
                   }
                   description={
-                    <Space direction="vertical" size={8} style={{ marginTop: 8 }}>
-                      {/* Ligne 1 : Département + Contrat + Lieu */}
+                    <Space direction="vertical" size={4} style={{ marginTop: 4 }}>
                       <Space size={24} style={{ fontSize: 13 }}>
-                        <Text type="secondary">🏢 {job.department?.nom || 'Non assigné'}</Text>
+                        <Text type="secondary">🏢 {job.department?.nom ?? 'Non assigné'}</Text>
                         <Text type="secondary">💼 {job.type_contrat}</Text>
                         <Text type="secondary">
-                          📍 {job.type_lieu === 'remote' ? '🏠 Remote' : job.type_lieu === 'hybrid' ? '🔄 Hybride' : '🏢 Sur site'}
+                          📍 {{ remote: '🏠 Remote', hybrid: '🔄 Hybride', onsite: '🏢 Sur site' }[job.type_lieu]}
                         </Text>
                       </Space>
-                      {/* Ligne 2 : Candidatures + Date + Salaire */}
                       <Space size={24} style={{ fontSize: 13 }}>
-                        <Text type="secondary">
-                          📩 {job.applications_count ?? 0} candidature{job.applications_count !== 1 ? 's' : ''}
-                        </Text>
+                        <Text type="secondary">📩 {job.applications_count ?? 0} candidature{job.applications_count !== 1 ? 's' : ''}</Text>
                         {job.date_limite && (
-                          <Text type="secondary">
-                            📅 {new Date(job.date_limite).toLocaleDateString('fr-FR')}
-                          </Text>
+                          <Text type="secondary">📅 {new Date(job.date_limite).toLocaleDateString('fr-FR')}</Text>
                         )}
                         {job.salaire_min && job.salaire_max && (
-                          <Text type="secondary">
-                            💰 {job.salaire_min} - {job.salaire_max} TND
-                          </Text>
+                          <Text type="secondary">💰 {job.salaire_min} – {job.salaire_max} TND</Text>
                         )}
                       </Space>
-                      {/* Ligne 3 : Description tronquée */}
-                      {job.description && (
-                        <Text 
-                          type="secondary" 
-                          style={{ 
-                            fontSize: 13, 
-                            maxWidth: 800, 
-                            display: '-webkit-box', 
-                            WebkitLineClamp: 2, 
-                            WebkitBoxOrient: 'vertical', 
-                            overflow: 'hidden' 
-                          }}
-                        >
-                          {job.description}
-                        </Text>
-                      )}
                     </Space>
                   }
                 />
@@ -347,19 +227,14 @@ export default function RhJobsPage() {
         />
       )}
 
-      {/* 🎯 Modale Créer/Modifier */}
-      <AntModal
+      {/* Modale Créer / Modifier */}
+      <Modal
         open={jobModal.isOpen}
-        onCancel={() => {
-          jobModal.close();
-          if (searchParams.get('action') === 'create') {
-            navigate('/rh/jobs', { replace: true });
-          }
-        }}
+        onCancel={handleModalClose}
         title={
           <Space>
             {jobModal.data ? <EditOutlined /> : <PlusOutlined />}
-            {jobModal.data ? '✏️ Modifier l\'offre' : ' Créer une nouvelle offre'}
+            {jobModal.data ? "Modifier l'offre" : 'Créer une nouvelle offre'}
           </Space>
         }
         footer={null}
@@ -370,14 +245,9 @@ export default function RhJobsPage() {
         <JobForm
           job={jobModal.data ?? undefined}
           onSuccess={handleFormSuccess}
-          onCancel={() => {
-            jobModal.close();
-            if (searchParams.get('action') === 'create') {
-              navigate('/rh/jobs', { replace: true });
-            }
-          }}
+          onCancel={handleModalClose}
         />
-      </AntModal>
+      </Modal>
     </RhLayout>
   );
 }

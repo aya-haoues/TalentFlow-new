@@ -2,8 +2,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message } from 'antd';
-import api, { authService } from '../../../services/api';
-import type { User } from '../../../types/index';
+import api, { authService } from '../services/api';
+import type { User } from '../types/index';
 
 /* ── Types exportés ─────────────────────────────────────── */
 export interface Application {

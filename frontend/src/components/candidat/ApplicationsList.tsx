@@ -1,4 +1,4 @@
-// src/pages/candidat/components/ApplicationsList.tsx
+// src/pages/components/candidat/ApplicationsList.tsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -10,7 +10,7 @@ import {
   SearchOutlined, ReloadOutlined, SolutionOutlined
 } from '@ant-design/icons';
 import { THEME, STATUS_CONFIG, getScoreColor } from './dashboardConfig';
-import type { Application, PaginationInfo } from '../hooks/useDashboard';
+import type { Application, PaginationInfo } from '../../hooks/useDashboard';
 
 const { Text } = Typography;
 const { Option } = Select;
@@ -207,7 +207,7 @@ export default function ApplicationsList({
               })()}
             </div>
 
-            <Descriptions title="💼 Offre" bordered size="small" column={1} style={{ marginBottom: 20 }}>
+            <Descriptions title=" Offre" bordered size="small" column={1} style={{ marginBottom: 20 }}>
               <Descriptions.Item label="Titre">{selectedApp.job?.titre}</Descriptions.Item>
               <Descriptions.Item label="Département">{selectedApp.job?.department?.nom || '—'}</Descriptions.Item>
               <Descriptions.Item label="Entreprise">{selectedApp.job?.entreprise || '—'}</Descriptions.Item>
@@ -225,7 +225,7 @@ export default function ApplicationsList({
 
             {selectedApp.motivation && (
               <>
-                <Divider>✍️ Ma motivation</Divider>
+                <Divider> Ma motivation</Divider>
                 <div style={{
                   background: THEME.primaryLight, borderRadius: 8,
                   padding: '12px 16px', borderLeft: `3px solid ${THEME.primary}`,

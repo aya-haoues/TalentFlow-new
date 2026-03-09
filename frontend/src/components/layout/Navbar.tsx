@@ -1,155 +1,121 @@
 // src/components/layout/Navbar.tsx
-import React, { useState, useEffect } from 'react';  // ✅ useEffect ajouté
+// Usage : pages publiques uniquement (Home, Jobs, About, Login, Register)
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Layout, Menu, Button, Space } from 'antd';
+import { Layout, Menu, Button, Space, Avatar, Dropdown } from 'antd';
 import {
   FileTextOutlined,
-  UserOutlined,
+  TeamOutlined,
   LoginOutlined,
   DashboardOutlined,
-  TeamOutlined
+  LogoutOutlined,
+  DownOutlined,
 } from '@ant-design/icons';
 import { authService } from '../../services/api';
-import type { User } from '../../types';
+import type { User, UserRole } from '../../types';
 import logo from '../../assets/comunik.jpg';
 
 const { Header } = Layout;
 
+const DASHBOARD_ROUTES: Record<UserRole, string> = {
+  candidat: '/candidat/dashboard',
+  rh:       '/rh/dashboard',
+  admin:    '/admin/dashboard',
+};
+
+const DASHBOARD_LABELS: Record<UserRole, string> = {
+  candidat: 'Mon espace',
+  rh:       'Tableau de bord RH',
+  admin:    'Administration',
+};
+
 export default function Navbar() {
   const navigate = useNavigate();
-  
-  // ✅ État unique et cohérent pour l'utilisateur
   const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // 🔑 Charger l'utilisateur au montage et écouter les changements
+  // Sync auth state (inclus changements inter-onglets)
   useEffect(() => {
-    const updateAuthState = () => {
-      const currentUser = authService.getCurrentUser();
-      setUser(currentUser);
-      setIsAuthenticated(!!currentUser);
-    };
-    
-    // Initialisation au montage
-    updateAuthState();
-    
-    // Optionnel : écouter les événements de storage pour synchroniser entre onglets
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'access_token' || e.key === 'user') {
-        updateAuthState();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Cleanup au démontage
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
+    const sync = () => setUser(authService.getCurrentUser());
+    sync();
+    window.addEventListener('storage', sync);
+    return () => window.removeEventListener('storage', sync);
   }, []);
 
-  // 🚪 Gestion de la déconnexion
   const handleLogout = async () => {
-    await authService.logout();  // ✅ Attendre la fin du logout
+    await authService.logout();
     setUser(null);
-    setIsAuthenticated(false);
-    navigate('/');  // ✅ Rediriger vers l'accueil
+    navigate('/');
   };
 
-  // 🔑 URL du Dashboard selon le rôle
-  const getDashboardUrl = (): string => {
-    if (!user) return '/login';
-    if (user.role === 'rh') return '/dashboard/rh';
-    if (user.role === 'manager') return '/dashboard/manager';
-    return '/candidat/dashboard';  // Ou '/dashboard/candidat' selon tes routes
-  };
+  const userMenuItems = user ? [
+    {
+      key: 'dashboard',
+      label: 'Mon tableau de bord',
+      icon: <DashboardOutlined />,
+      onClick: () => navigate(DASHBOARD_ROUTES[user.role]),
+    },
+    { type: 'divider' as const },
+    {
+      key: 'logout',
+      label: 'Déconnexion',
+      icon: <LogoutOutlined />,
+      onClick: handleLogout,
+      danger: true,
+    },
+  ] : [];
 
   return (
     <Header style={{
-      background: '#ffffff',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-      position: 'sticky',
-      top: 0,
-      zIndex: 1000,
-      padding: '0 24px',
-      display: 'flex',
-      alignItems: 'center',
+      background:     '#ffffff',
+      boxShadow:      '0 2px 8px rgba(0,0,0,0.06)',
+      position:       'sticky',
+      top:            0,
+      zIndex:         1000,
+      padding:        '0 24px',
+      display:        'flex',
+      alignItems:     'center',
       justifyContent: 'space-between',
-      height: 64
+      height:         64,
     }}>
-      {/* 🎨 Logo */}
+      {/* Logo */}
       <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-        <img 
-          src={logo} 
-          alt="TalentFlow" 
-          style={{ height: 32, width: 'auto', objectFit: 'contain' }} 
-        />
-        <span style={{ fontSize: 22, fontWeight: 'bold', color: '#004d4a' }}>TalentFlow</span>
+        <img src={logo} alt="TalentFlow" style={{ height: 32, objectFit: 'contain' }} />
+        <span style={{ fontSize: 20, fontWeight: 700, color: '#004d4a' }}>TalentFlow</span>
       </Link>
 
-      {/* 🧭 Menu de navigation central */}
+      {/* Navigation centrale */}
       <Menu
         mode="horizontal"
-        style={{
-          flex: 1,
-          display: 'flex',
-          justifyContent: 'center',
-          border: 'none',
-          background: 'transparent',
-          fontWeight: 500
-        }}
+        selectedKeys={[location.pathname]}
+        style={{ flex: 1, justifyContent: 'center', border: 'none', background: 'transparent' }}
         items={[
-          { key: 'home', label: <Link to="/">Accueil</Link> },
-          {
-            key: 'jobs',
-            label: <Link to="/jobs">Offres d'emploi</Link>,
-            icon: <FileTextOutlined />
-          },
-          {
-            key: 'about',
-            label: <Link to="/about">À Propos</Link>,
-            icon: <TeamOutlined />
-          }
+          { key: '/',      label: <Link to="/">Accueil</Link> },
+          { key: '/jobs',  label: <Link to="/jobs">Offres d'emploi</Link>, icon: <FileTextOutlined /> },
+          { key: '/about', label: <Link to="/about">À Propos</Link>,       icon: <TeamOutlined /> },
         ]}
       />
 
-      {/* 👤 Boutons d'authentification */}
+      {/* Auth buttons */}
       <Space size="middle">
-        {isAuthenticated && user ? (
-          // ✅ Utilisateur connecté
-          <>
-            <Link to={getDashboardUrl()}>
-              <Button 
-                type="primary" 
-                icon={<DashboardOutlined />}
-                style={{ backgroundColor: '#00a89c', borderColor: '#00a89c' }}
-              >
-                {user.role === 'rh' ? 'Tableau de bord RH' : 
-                 user.role === 'manager' ? 'Espace Manager' : 'Mon espace'}
-              </Button>
-            </Link>
-            
-            <Button 
-              type="text" 
-              icon={<UserOutlined />} 
-              onClick={handleLogout}
-              style={{ color: '#666' }}
-            >
-              Déconnexion
-            </Button>
-          </>
+        {user ? (
+          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
+            <Space style={{ cursor: 'pointer' }}>
+              <Avatar style={{ background: '#00a89c', fontWeight: 600 }}>
+                {user.name.charAt(0).toUpperCase()}
+              </Avatar>
+              <span style={{ color: '#1a3636', fontWeight: 500 }}>
+                {DASHBOARD_LABELS[user.role]}
+              </span>
+              <DownOutlined style={{ fontSize: 10, color: '#999' }} />
+            </Space>
+          </Dropdown>
         ) : (
-          // ❌ Utilisateur non connecté
           <>
             <Link to="/login">
-              <Button type="text" icon={<LoginOutlined />}>
-                Se connecter
-              </Button>
+              <Button type="text" icon={<LoginOutlined />}>Se connecter</Button>
             </Link>
             <Link to="/register">
-              <Button 
-                type="primary" 
-                style={{ backgroundColor: '#00a89c', borderColor: '#00a89c' }}
-              >
+              <Button type="primary" style={{ background: '#00a89c', borderColor: '#00a89c' }}>
                 S'inscrire
               </Button>
             </Link>

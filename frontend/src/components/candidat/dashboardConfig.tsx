@@ -1,4 +1,4 @@
-// src/pages/candidat/components/dashboardConfig.tsx
+// src/pages/components/candidat/dashboardConfig.tsx
 import React from 'react';
 import {
   ClockCircleOutlined, UserOutlined, CheckCircleOutlined,
@@ -67,7 +67,7 @@ export const QUICK_ACTIONS = [
 /* ── Helper couleur score ───────────────────────────────── */
 export const getScoreColor = (score?: number): string => {
   if (!score) return '#ccc';
-  if (score >= 85) return '#52c41a';
+  if (score >= 85) return '#008b82';
   if (score >= 70) return '#faad14';
   return '#1890ff';
 };

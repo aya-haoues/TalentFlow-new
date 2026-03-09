@@ -4,8 +4,8 @@ import {
   Form, Input, Select, DatePicker, InputNumber, Button, Space, Row, Col, Alert, message
 } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
-import { jobsService, JOB_CONSTANTS } from '../../services/jobs';
-import { departmentsService } from '../../services/departments';
+import { jobsService, JOB_CONSTANTS } from '../../services/jobs.service';
+import { departmentsService } from '../../services/departments.service';
 import type { JobInput, JobFormProps, JobFormValues } from '../../types';
 import dayjs from 'dayjs';
 import { AxiosError } from 'axios';

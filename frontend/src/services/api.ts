@@ -60,7 +60,7 @@ export const authService = {
 
   login: async (
     credentials: LoginFormData | { provider: 'google' | 'linkedin'; token: string },
-    loginType: 'default' | 'rh' | 'manager' = 'default'
+    loginType: 'default' | 'rh' | 'manager' | 'admin' = 'default'
   ): Promise<AuthResponse> => {
     const endpoint = loginType === 'default' ? '/login' : `/login/${loginType}`;
     const response = await api.post<AuthResponse>(endpoint, credentials);
@@ -99,7 +99,7 @@ export const authService = {
   logout: async (): Promise<void> => {
     try {
       await api.post('/logout');
-    } catch (e) {
+    } catch {
       console.warn('⚠️ Logout backend échoué');
     } finally {
       localStorage.removeItem('access_token');
@@ -112,7 +112,7 @@ export const authService = {
     try {
       const userStr = localStorage.getItem('user');
       return userStr ? (JSON.parse(userStr) as User) : null;
-    } catch (e) {
+    } catch {
       return null;
     }
   },

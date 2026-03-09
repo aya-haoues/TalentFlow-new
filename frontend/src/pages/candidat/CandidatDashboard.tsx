@@ -6,10 +6,10 @@ import {
   CheckCircleOutlined, RiseOutlined
 } from '@ant-design/icons';
 import Navbar from '../../components/layout/Navbar';
-import ApplicationsList from './components/ApplicationsList';
-import DashboardSidebar from './components/DashboardSidebar';
-import { useDashboard } from './hooks/useDashboard';
-import { THEME } from './components/dashboardConfig';
+import ApplicationsList from '../../components/candidat/ApplicationsList';
+import DashboardSidebar from '../../components/candidat/DashboardSidebar';
+import { useDashboard } from '../../hooks/useDashboard';
+import { THEME } from '../../components/candidat/dashboardConfig';
 
 const { Title, Text } = Typography;
 
@@ -37,7 +37,7 @@ export default function CandidatDashboard() {
           {/* ── Header ──────────────────────────────── */}
           <div style={{ marginBottom: 24 }}>
             <Title level={2} style={{ color: THEME.text, margin: '0 0 8px 0' }}>
-              👋 Bonjour, {user?.name?.split(' ')[0] || 'Candidat'} !
+               Bonjour, {user?.name?.split(' ')[0] || 'Candidat'} !
             </Title>
             <Text type="secondary">
               Suivez vos candidatures et optimisez votre recherche d'emploi
