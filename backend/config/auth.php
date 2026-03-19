@@ -71,6 +71,11 @@ return [
         // ],
     ],
 
+    'admin' => [
+        'email'    => env('ADMIN_EMAIL', 'admin@talentflow.tn'),
+        'password' => env('ADMIN_PASSWORD'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Resetting Passwords
@@ -92,7 +97,9 @@ return [
 
     'passwords' => [
         'users' => [
+            'driver'    => 'database',  // stocke les tokens en BDD
             'provider' => 'users',
+            'table'     => 'password_reset_tokens',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
             'throttle' => 60,
@@ -111,5 +118,10 @@ return [
     */
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
+
+    'verification' => [
+        'expire' => 60,  // minutes — lien expire après 60 minutes
+    ],
+
 
 ];

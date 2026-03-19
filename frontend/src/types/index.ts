@@ -17,14 +17,15 @@ export type Gender           = 'homme' | 'femme' | 'autre' | 'prefer_ne_pas_repo
    ENTITÉS PRINCIPALES
 ══════════════════════════════════════════════════════════ */
 export interface User {
-  id:           number;
-  name:         string;
-  email:        string;
-  role:         UserRole;
-  telephone?:   string;
-  linkedin_url?: string;
-  avatar?:      string;
-  cv_path?:     string;
+  id:                  number;
+  name:                string;
+  email:               string;
+  role:                UserRole;
+  telephone?:          string;
+  linkedin_url?:       string;
+  avatar?:             string;
+  cv_path?:            string;
+  email_verified_at?:  string | null;  // ← ajouter cette ligne
 }
 
 export interface Department {

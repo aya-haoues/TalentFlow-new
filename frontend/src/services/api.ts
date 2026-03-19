@@ -1,5 +1,6 @@
 // src/services/api.ts
 import axios, { AxiosError } from 'axios';
+
 import type { 
   AuthResponse, 
   RegisterFormData, 
@@ -72,6 +73,28 @@ export const authService = {
     return response.data;
   },
 
+  resendVerificationEmail: async () => {
+      const response = await api.post('/email/resend-verification');
+      return response.data;
+  },
+  
+
+
+  forgotPassword: async (email: string) => {
+      const response = await api.post('/forgot-password', { email });
+      return response.data;
+  },
+
+  resetPassword: async (data: {
+      token: string;
+      email: string;
+      password: string;
+      password_confirmation: string;
+  }) => {
+      const response = await api.post('/reset-password', data);
+      return response.data;
+  },
+
   /**
    * ✅ RÉCUPÉRER L'UTILISATEUR DEPUIS LE SERVEUR (Anciennement fetchCurrentUser)
    * Cette méthode est cruciale après un login social pour récupérer le profil complet
@@ -136,5 +159,7 @@ export const applicationService = {
     return response.data.success ? response.data.data : [];
   }
 };
+
+
 
 export default api;

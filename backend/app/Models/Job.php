@@ -4,7 +4,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\Application;      // Pour la relation avec les candidatures
@@ -13,6 +13,11 @@ use App\Models\Departement;
 class Job extends Model
 {
     use HasFactory;
+
+    // app/Models/Job.php
+    protected $connection = 'mongodb';
+    protected $collection = 'offres';   // ← changer jobs → offres
+    protected $table      = 'offres';   // ← ajouter aussi
 
     // 🔐 Champs qu'on autorise à remplir massivement (protection Mass Assignment)
     protected $fillable = [

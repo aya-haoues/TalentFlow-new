@@ -16,6 +16,7 @@ class RoleMiddleware
      */
     public function handle(Request $request, Closure $next, string $role): Response
     {
+        // Vérification défensive — au cas où utilisé sans auth:sanctum
         if (!$request->user()) {
             return response()->json([
                 'success' => false,
@@ -23,6 +24,7 @@ class RoleMiddleware
             ], 401);  
         }
 
+        // Vérifier si le rôle de l'user est dans la liste des rôles autorisés
         if ($request->user()->role !== $role) {
             return response()->json([
                 'success' => false,

@@ -1,26 +1,22 @@
 <?php
-// app/Http/Controllers/Api/JobController.php
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Job;
-use App\Models\Departement; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class JobController extends Controller
 {
-     /**
-     * Liste des offres PUBLIÉES uniquement (publique)
+    /**
+     * Liste des offres publiées — publique
      * GET /api/jobs
      */
     public function indexPublic(Request $request)
     {
         $query = Job::query();
 
-        // Filtres optionnels pour le public
         if ($request->filled('type_contrat')) {
             $query->where('type_contrat', $request->type_contrat);
         }
@@ -34,51 +30,40 @@ class JobController extends Controller
             $query->where('department_id', $request->department_id);
         }
         if ($request->filled('search')) {
-            $query->where(function($q) use ($request) {
+            $query->where(function ($q) use ($request) {
                 $q->where('titre', 'like', "%{$request->search}%")
                   ->orWhere('description', 'like', "%{$request->search}%");
             });
         }
 
-        // ✅ Filtrer uniquement les offres publiées + eager loading
         $jobs = $query->where('statut', 'publiee')
                       ->with(['department'])
                       ->latest()
                       ->paginate(10);
 
-        return response()->json([
-            'success' => true,
-            'data' => $jobs
-        ]);
+        return response()->json(['success' => true, 'data' => $jobs]);
     }
 
     /**
-     * Détail d'une offre PUBLIÉE uniquement (publique)
+     * Détail d'une offre publiée — publique
      * GET /api/jobs/{id}
      */
     public function showPublic($id)
     {
         $job = Job::with(['department'])
                   ->where('id', $id)
-                  ->where('statut', 'publiee')  // ✅ Seulement les offres publiées
+                  ->where('statut', 'publiee')
                   ->first();
-        
+
         if (!$job) {
             return response()->json([
                 'success' => false,
-                'message' => 'Offre non trouvée ou non publiée'
+                'message' => 'Offre non trouvée ou non publiée',
             ], 404);
         }
-        
-        return response()->json([
-            'success' => true,
-            'data' => $job
-        ]);
-    }
 
-    // ========================================================================
-    // 👨‍💼 MÉTHODES RH (Avec authentification et autorisation)
-    // ========================================================================
+        return response()->json(['success' => true, 'data' => $job]);
+    }
 
     /**
      * Liste des offres pour RH (tous statuts)
@@ -86,9 +71,11 @@ class JobController extends Controller
      */
     public function index(Request $request)
     {
+        // ✅ Policy viewAny
+        $this->authorize('viewAny', Job::class);
+
         $query = Job::query();
 
-        // Filtres RH (incluant le statut)
         if ($request->filled('statut')) {
             $query->where('statut', $request->statut);
         }
@@ -106,137 +93,128 @@ class JobController extends Controller
                       ->latest()
                       ->paginate(10);
 
-        return response()->json([
-            'success' => true,
-            'data' => $jobs
-        ]);
+        return response()->json(['success' => true, 'data' => $jobs]);
     }
 
     /**
-     * Détail d'une offre pour RH (tous statuts)
-     * GET /api/rh/jobs/{id}
+     * Détail d'une offre pour RH
+     * GET /api/rh/jobs/{job}
      */
     public function show(Job $job)
     {
+        // ✅ Policy view
+        $this->authorize('view', $job);
+
         $job->load(['department', 'creator', 'applications']);
-        
-        return response()->json([
-            'success' => true,
-            'data' => $job
-        ]);
+
+        return response()->json(['success' => true, 'data' => $job]);
     }
+
     /**
-     * CRÉER une offre
-     * POST /api/jobs
+     * Créer une offre
+     * POST /api/rh/jobs
      */
     public function store(Request $request)
     {
+        // ✅ Policy create
+        $this->authorize('create', Job::class);
+
         try {
-            //  VALIDATION : règles exactes de ta migration
             $validated = $request->validate([
-                'titre' => 'required|string|max:255',
-                'department_id' => 'required|exists:departments,id',
-                'type_contrat' => 'required|in:CDI,CDD,Stage,Alternance,Freelance',
-                'niveau_experience' => 'required|in:junior,confirme,senior',
-                'type_lieu' => 'required|in:remote,hybrid,onsite',
-                'description' => 'required|string|min:50',
-                'competences_requises' => 'required|array|min:1',
+                'titre'                  => 'required|string|max:255',
+                'department_id'          => 'required|exists:departments,id',
+                'type_contrat'           => 'required|in:CDI,CDD,Stage,Alternance,Freelance',
+                'niveau_experience'      => 'required|in:junior,confirme,senior',
+                'type_lieu'              => 'required|in:remote,hybrid,onsite',
+                'description'            => 'required|string|min:50',
+                'competences_requises'   => 'required|array|min:1',
                 'competences_requises.*' => 'string|max:50',
-                'statut' => 'nullable|in:brouillon,publiee,pausee,archivee',
-                'nombre_postes' => 'nullable|integer|min:1',
-                'date_limite' => 'nullable|date|after_or_equal:today',
-                'salaire_min' => 'nullable|integer|min:0',
-                'salaire_max' => 'nullable|integer|min:0|gte:salaire_min',
+                'statut'                 => 'nullable|in:brouillon,publiee,pausee,archivee',
+                'nombre_postes'          => 'nullable|integer|min:1',
+                'date_limite'            => 'nullable|date|after_or_equal:today',
+                'salaire_min'            => 'nullable|integer|min:0',
+                'salaire_max'            => 'nullable|integer|min:0|gte:salaire_min',
             ]);
 
-            // RH connecté (sécurité)
             $job = Job::create([
                 ...$validated,
                 'created_by' => Auth::id(),
-                'statut' => $validated['statut'] ?? 'brouillon'
+                'statut'     => $validated['statut'] ?? 'brouillon',
             ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Offre créée avec succès',
-                'data' => $job->load(['department', 'creator'])
+                'data'    => $job->load(['department', 'creator']),
             ], 201);
 
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            // Laravel renvoie automatiquement 422 avec les erreurs
-            throw $e;
         } catch (\Exception $e) {
             Log::error('Erreur création offre: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur serveur lors de la création.'
+                'message' => 'Erreur serveur lors de la création.',
             ], 500);
         }
     }
 
-
     /**
-     * MODIFIER une offre
-     * PUT /api/jobs/{id}
+     * Modifier une offre
+     * PUT /api/rh/jobs/{job}
      */
-   public function update(Request $request, Job $job)
-{
-    
-    try {
-        $validated = $request->validate([
-            'titre' => 'sometimes|required|string|max:255',
-            'department_id' => 'sometimes|required|exists:departments,id',
-            'type_contrat' => 'sometimes|required|in:CDI,CDD,Stage,Alternance,Freelance',
-            'niveau_experience' => 'sometimes|required|in:junior,confirme,senior',
-            'type_lieu' => 'sometimes|required|in:remote,hybrid,onsite',
-            'description' => 'sometimes|required|string|min:50',
-            'competences_requises' => 'sometimes|required|array|min:1',
-            'competences_requises.*' => 'string|max:50',
-            'statut' => 'sometimes|in:brouillon,publiee,pausee,archivee',
-            'nombre_postes' => 'sometimes|nullable|integer|min:1',
-            'date_limite' => 'sometimes|nullable|date',
-            'salaire_min' => 'sometimes|nullable|integer|min:0',
-            'salaire_max' => 'sometimes|nullable|integer|min:0|gte:salaire_min',
-        ]);
+    public function update(Request $request, Job $job)
+    {
+        // ✅ Policy update — seulement le créateur
+        // Remplace l'ancienne absence de vérification
+        $this->authorize('update', $job);
 
-        $job->update($validated);
+        try {
+            $validated = $request->validate([
+                'titre'                  => 'sometimes|required|string|max:255',
+                'department_id'          => 'sometimes|required|exists:departments,id',
+                'type_contrat'           => 'sometimes|required|in:CDI,CDD,Stage,Alternance,Freelance',
+                'niveau_experience'      => 'sometimes|required|in:junior,confirme,senior',
+                'type_lieu'              => 'sometimes|required|in:remote,hybrid,onsite',
+                'description'            => 'sometimes|required|string|min:50',
+                'competences_requises'   => 'sometimes|required|array|min:1',
+                'competences_requises.*' => 'string|max:50',
+                'statut'                 => 'sometimes|in:brouillon,publiee,pausee,archivee',
+                'nombre_postes'          => 'sometimes|nullable|integer|min:1',
+                'date_limite'            => 'sometimes|nullable|date',
+                'salaire_min'            => 'sometimes|nullable|integer|min:0',
+                'salaire_max'            => 'sometimes|nullable|integer|min:0|gte:salaire_min',
+            ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Offre mise à jour avec succès',
-            'data' => $job->fresh() 
-        ]);
+            $job->update($validated);
 
-    } catch (\Illuminate\Validation\ValidationException $e) {
-        // Laravel gère automatiquement cette erreur → 422 Unprocessable Entity
-        throw $e;
-        
-    } catch (\Exception $e) {
-        Log::error('Erreur mise à jour offre: ' . $e->getMessage());
-        return response()->json([
-            'success' => false,
-            'message' => 'Erreur serveur lors de la mise à jour.'
-        ], 500);
+            return response()->json([
+                'success' => true,
+                'message' => 'Offre mise à jour avec succès',
+                'data'    => $job->fresh(),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Erreur mise à jour offre: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur serveur lors de la mise à jour.',
+            ], 500);
+        }
     }
-}
+
     /**
-     * SUPPRIMER une offre
-     * DELETE /api/jobs/{id}
+     * Supprimer une offre
+     * DELETE /api/rh/jobs/{job}
      */
     public function destroy(Job $job)
     {
-        if ($job->created_by !== Auth::id()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Accès refusé.'
-            ], 403);
-        }
+        // ✅ Policy delete — remplace la vérif manuelle
+        // Avant : if ($job->created_by !== Auth::id()) { abort(403) }
+        $this->authorize('delete', $job);
 
-        // vérifier avant de supprimer si des candidatures existent
         if ($job->applications()->count() > 0) {
             return response()->json([
                 'success' => false,
-                'message' => 'Impossible de supprimer : des candidatures sont liées à cette offre.'
+                'message' => 'Impossible de supprimer : des candidatures sont liées à cette offre.',
             ], 400);
         }
 
@@ -244,7 +222,7 @@ class JobController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Offre supprimée'
+            'message' => 'Offre supprimée',
         ]);
     }
 }

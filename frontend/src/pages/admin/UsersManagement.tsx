@@ -80,11 +80,17 @@ export default function UsersManagement() {
   const handleApprove = async (id: number) => {
     setActionId(id);
     try {
-      await api.post(`/admin/users/${id}/approve`);
+      const res = await api.post(`/admin/users/${id}/approve`);
+      console.log('Response:', res.data); // ← ajouter
       message.success('Compte approuvé');
       setUsers((prev) => prev.map((u) => u.id === id ? { ...u, is_approved: true } : u));
-    } catch { message.error('Erreur'); } finally { setActionId(null); }
-  };
+    } catch (err) {
+      console.error('Erreur approve:', err); // ← ajouter
+      message.error('Erreur');
+    } finally { 
+      setActionId(null); 
+    }
+};
 
   const handleReject = async (id: number) => {
     setActionId(id);

@@ -85,7 +85,7 @@ export default function CandidateDrawer({
       </Descriptions>
 
       {/* Infos offre */}
-      <Descriptions title="💼 Offre" bordered size="small" column={1} style={{ marginBottom: 20 }}>
+      <Descriptions title="Offre" bordered size="small" column={1} style={{ marginBottom: 20 }}>
         <Descriptions.Item label="Titre">{application.job?.titre}</Descriptions.Item>
         <Descriptions.Item label="Département">
           {application.job?.department?.nom ?? '—'}
@@ -103,7 +103,7 @@ export default function CandidateDrawer({
       {/* Motivation */}
       {application.why_us && (
         <>
-          <Divider>✍️ Motivation</Divider>
+          <Divider>Motivation</Divider>
           <div style={{
             background:   '#e6fffb',
             borderRadius: 8,

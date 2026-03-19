@@ -1,50 +1,31 @@
 <?php
-// backend/app/Models/Application.php
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use MongoDB\Laravel\Eloquent\Model;
 
 class Application extends Model
 {
-    // ✅ Champs mass-assignables (incluant les nouveaux)
+    protected $connection = 'mongodb';
+    protected $collection = 'applications';
+
     protected $fillable = [
-        'user_id',
-        'job_id',
-        'cv_path',
-        'lettre_motivation',  // Ancien champ (gardé pour rétrocompatibilité)
-        'motivation',         // ✅ Nouveau : why_us du frontend
-        'contract_type_preferred',
-        'handicap_info',
-        'experiences',        // ✅ JSON
-        'formations',         // ✅ JSON
-        'skills',             // ✅ JSON
-        'challenges',         // ✅ JSON
-        'statut',
-        'notes_internes',
-        'date_candidature',
-        'date_derniere_modification',
+        'job_id', 'candidate_id', 'statut',
+        'date_candidature', 'date_derniere_modification',
+        'cv_path', 'lettre_motivation',
+        'nom', 'prenom', 'email', 'telephone',
+        'date_naissance', 'genre', 'nationalite',
+        'adresse', 'linkedin_url', 'github_url', 'site_web',
+        'motivation', 'contract_type_preferred',
+        'handicap_info', 'notes_internes',
+        'experiences', 'formations', 'skills', 'challenges',
     ];
 
-    // ✅ Casts automatiques JSON → Array PHP
     protected $casts = [
+        'adresse'     => 'array',
         'experiences' => 'array',
-        'formations' => 'array',
-        'skills' => 'array',
-        'challenges' => 'array',
-        'date_candidature' => 'datetime',
-        'date_derniere_modification' => 'datetime',
+        'formations'  => 'array',
+        'skills'      => 'array',
+        'challenges'  => 'array',
     ];
-
-    // 🔗 Relations
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    public function job(): BelongsTo
-    {
-        return $this->belongsTo(Job::class);
-    }
 }

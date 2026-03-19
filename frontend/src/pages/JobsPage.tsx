@@ -12,7 +12,7 @@ export default function JobsPage() {
       <Content style={{ padding: '2rem 1rem', background: '#f5f5f5', flex: 1 }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <Title level={2} style={{ textAlign: 'center', color: '#004d4a', marginBottom: 8 }}>
-            🎯 Toutes nos offres d'emploi
+             Toutes nos offres d'emploi
           </Title>
           <Paragraph style={{ textAlign: 'center', color: '#666', marginBottom: 32, fontSize: 16 }}>
             Postulez aux offres qui correspondent à votre profil.

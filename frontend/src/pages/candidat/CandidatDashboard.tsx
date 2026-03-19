@@ -1,23 +1,23 @@
 // src/pages/candidat/CandidatDashboard.tsx
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col, Card, Statistic, Alert, Button, Typography } from 'antd';
+import { Row, Col, Card, Statistic, Alert, Button, Typography, message } from 'antd';
 import {
   FileTextOutlined, ClockCircleOutlined, UserOutlined,
-  CheckCircleOutlined, RiseOutlined
+  CheckCircleOutlined, RiseOutlined, MailOutlined,
 } from '@ant-design/icons';
 import Navbar from '../../components/layout/Navbar';
 import ApplicationsList from '../../components/candidat/ApplicationsList';
 import DashboardSidebar from '../../components/candidat/DashboardSidebar';
 import { useDashboard } from '../../hooks/useDashboard';
 import { THEME } from '../../components/candidat/dashboardConfig';
+import { authService } from '../../services/api'; // ← ton service API existant
 
 const { Title, Text } = Typography;
 
-/* ══════════════════════════════════════════════════════════
-   COMPOSANT PRINCIPAL — orchestrateur léger
-══════════════════════════════════════════════════════════ */
 export default function CandidatDashboard() {
   const navigate = useNavigate();
+  const [resending, setResending] = useState(false);
 
   const {
     loading, applications, stats, pagination, user,
@@ -27,6 +27,19 @@ export default function CandidatDashboard() {
     handlePageChange, handleRefresh,
   } = useDashboard();
 
+  // ── Renvoyer l'email de vérification ──────────────
+  const handleResendVerification = async () => {
+    setResending(true);
+    try {
+      await authService.resendVerificationEmail();
+      message.success('Email de vérification envoyé ! Vérifiez votre boîte mail.');
+    } catch {
+      message.error('Erreur lors de l\'envoi. Réessayez dans quelques minutes.');
+    } finally {
+      setResending(false);
+    }
+  };
+
   return (
     <>
       <Navbar />
@@ -34,17 +47,51 @@ export default function CandidatDashboard() {
       <div style={{ minHeight: 'calc(100vh - 64px)', background: THEME.bg, padding: '24px 16px' }}>
         <div style={{ maxWidth: 1280, margin: '0 auto' }}>
 
-          {/* ── Header ──────────────────────────────── */}
+          {/* ── Header ────────────────────────────── */}
           <div style={{ marginBottom: 24 }}>
             <Title level={2} style={{ color: THEME.text, margin: '0 0 8px 0' }}>
-               Bonjour, {user?.name?.split(' ')[0] || 'Candidat'} !
+              Bonjour, {user?.name?.split(' ')[0] || 'Candidat'} !
             </Title>
             <Text type="secondary">
               Suivez vos candidatures et optimisez votre recherche d'emploi
             </Text>
           </div>
 
-          {/* ── Stats ───────────────────────────────── */}
+          {/* ── Bandeau vérification email ─────────── */}
+          {user && !user.email_verified_at && (
+            <Alert
+              style={{ marginBottom: 24, borderRadius: THEME.cardRadius }}
+              icon={<MailOutlined />}
+              showIcon
+              type="warning"
+              message="Vérifiez votre adresse email"
+              description={
+                <span>
+                  Un email de vérification a été envoyé à{' '}
+                  <strong>{user.email}</strong>.
+                  Vérifiez votre boîte mail et cliquez sur le lien pour
+                  activer toutes les fonctionnalités.
+                </span>
+              }
+              action={
+                <Button
+                  size="small"
+                  loading={resending}
+                  icon={<MailOutlined />}
+                  onClick={handleResendVerification}
+                  style={{
+                    backgroundColor: '#fa8c16',
+                    borderColor: '#fa8c16',
+                    color: '#fff',
+                  }}
+                >
+                  Renvoyer l'email
+                </Button>
+              }
+            />
+          )}
+
+          {/* ── Stats ─────────────────────────────── */}
           <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
             {[
               { label: 'Total candidatures', value: stats.total,      color: THEME.primaryDark, icon: <FileTextOutlined style={{ color: THEME.primary }} />,   sub: 'Toutes offres confondues' },
@@ -53,24 +100,28 @@ export default function CandidatDashboard() {
               { label: 'Acceptées',          value: stats.acceptee,   color: '#52c41a',          icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,     sub: 'Félicitations ! 🎉'       },
             ].map((s) => (
               <Col xs={24} sm={12} md={6} key={s.label}>
-                <Card hoverable style={{ borderRadius: THEME.cardRadius, boxShadow: THEME.cardShadow, border: 'none', textAlign: 'center' }}
-                  styles={{ body: { padding: 20 } }}>
+                <Card
+                  hoverable
+                  style={{ borderRadius: THEME.cardRadius, boxShadow: THEME.cardShadow, border: 'none', textAlign: 'center' }}
+                  styles={{ body: { padding: 20 } }}
+                >
                   <Statistic
                     title={s.label}
                     value={s.value}
                     prefix={s.icon}
                     valueStyle={{ color: s.color, fontWeight: 700, fontSize: 28 }}
                   />
-                  <Text type="secondary" style={{ display: 'block', marginTop: 4, fontSize: 13 }}>{s.sub}</Text>
+                  <Text type="secondary" style={{ display: 'block', marginTop: 4, fontSize: 13 }}>
+                    {s.sub}
+                  </Text>
                 </Card>
               </Col>
             ))}
           </Row>
 
-          {/* ── Contenu principal ───────────────────── */}
+          {/* ── Contenu principal ─────────────────── */}
           <Row gutter={[24, 24]}>
 
-            {/* Colonne gauche : candidatures */}
             <Col xs={24} lg={16}>
               <ApplicationsList
                 applications={applications}
@@ -88,7 +139,6 @@ export default function CandidatDashboard() {
                 onCloseDetail={closeDetail}
               />
 
-              {/* Recommandations IA (placeholder) */}
               <Card
                 title={
                   <span>
@@ -104,7 +154,9 @@ export default function CandidatDashboard() {
                   type="info"
                   showIcon
                   action={
-                    <Button size="small" type="primary"
+                    <Button
+                      size="small"
+                      type="primary"
                       style={{ backgroundColor: THEME.primary, borderColor: THEME.primary }}
                       onClick={() => navigate('/candidat/profil')}
                     >
@@ -115,7 +167,6 @@ export default function CandidatDashboard() {
               </Card>
             </Col>
 
-            {/* Colonne droite : sidebar */}
             <Col xs={24} lg={8}>
               <DashboardSidebar user={user} stats={stats} />
             </Col>

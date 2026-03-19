@@ -10,10 +10,7 @@ use Illuminate\Support\Facades\Log;
 
 class AdminController extends Controller
 {
-    /* ═══════════════════════════════════════════════════════
-       STATS GLOBALES
-    ═══════════════════════════════════════════════════════ */
-
+    
     public function stats()
     {
         return response()->json([
@@ -33,15 +30,13 @@ class AdminController extends Controller
         ]);
     }
 
-    /* ═══════════════════════════════════════════════════════
-       LISTE UTILISATEURS
-    ═══════════════════════════════════════════════════════ */
-
+    
     public function index(Request $request)
     {
         $query = User::where('role', '!=', 'admin')
                      ->orderBy('created_at', 'desc');
-
+        log($query);
+        
         // Filtre rôle
         if ($request->filled('role') && $request->role !== 'all') {
             $query->where('role', $request->role);
@@ -103,10 +98,8 @@ class AdminController extends Controller
        APPROUVER
     ═══════════════════════════════════════════════════════ */
 
-    public function approve($id)
+    public function approve(User $user)  // ← Laravel injecte automatiquement
     {
-        $user = User::findOrFail($id);
-
         if (!in_array($user->role, ['rh', 'manager'])) {
             return response()->json([
                 'success' => false,
@@ -116,74 +109,86 @@ class AdminController extends Controller
 
         $user->update(['is_approved' => true]);
 
-        Log::info('✅ Compte approuvé', ['user_id' => $user->id, 'role' => $user->role]);
+        Log::info('✅ Compte approuvé', [
+            'user_id' => $user->id,
+            'role'    => $user->role,
+        ]);
 
-        return response()->json(['success' => true, 'message' => 'Compte approuvé.', 'data' => $user]);
+        return response()->json([
+            'success' => true,
+            'message' => 'Compte approuvé.',
+            'data'    => $user,
+        ]);
     }
 
     /* ═══════════════════════════════════════════════════════
        REJETER
     ═══════════════════════════════════════════════════════ */
 
-    public function reject($id)
-    {
-        $user = User::findOrFail($id);
+    // ✅ Toutes avec Route Model Binding
 
-        Log::info('🗑 Compte rejeté', ['user_id' => $user->id, 'role' => $user->role]);
-
-        $user->delete();
-
-        return response()->json(['success' => true, 'message' => 'Compte rejeté et supprimé.']);
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       BLOQUER / DÉBLOQUER
-    ═══════════════════════════════════════════════════════ */
-
-    public function toggleBlock($id)
-    {
-        $user = User::findOrFail($id);
-
-        if ($user->role === 'admin') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Impossible de bloquer le compte administrateur.',
-            ], 403);
-        }
-
-        $user->update(['is_blocked' => !$user->is_blocked]);
-
-        $action = $user->is_blocked ? 'bloqué' : 'débloqué';
-        Log::info("🔒 Utilisateur {$action}", ['user_id' => $user->id]);
-
+public function reject(User $user)
+{
+    if (!in_array($user->role, ['rh', 'manager'])) {
         return response()->json([
-            'success' => true,
-            'message' => "Utilisateur {$action}.",
-            'data'    => $user,
-        ]);
+            'success' => false,
+            'message' => 'Seuls les comptes RH et Manager nécessitent une approbation.',
+        ], 422);
     }
 
-    /* ═══════════════════════════════════════════════════════
-       SUPPRIMER
-    ═══════════════════════════════════════════════════════ */
+    $user->update(['is_approved' => false]);
 
-    public function destroy($id)
-    {
-        $user = User::findOrFail($id);
+    Log::info('❌ Compte rejeté', ['user_id' => $user->id]);
 
-        if ($user->role === 'admin') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Impossible de supprimer le compte administrateur.',
-            ], 403);
-        }
+    return response()->json([
+        'success' => true,
+        'message' => 'Compte rejeté.',
+        'data'    => $user,
+    ]);
+}
 
-        Log::info('🗑 Utilisateur supprimé', ['user_id' => $user->id, 'email' => $user->email]);
-
-        $user->delete();
-
-        return response()->json(['success' => true, 'message' => 'Utilisateur supprimé.']);
+public function toggleBlock(User $user)
+{
+    // Empêcher de bloquer l'admin
+    if ($user->role === 'admin') {
+        return response()->json([
+            'success' => false,
+            'message' => 'Impossible de bloquer un administrateur.',
+        ], 422);
     }
+
+    $user->update(['is_blocked' => !$user->is_blocked]);
+
+    $action = $user->is_blocked ? 'bloqué' : 'débloqué';
+
+    Log::info("🔒 Compte {$action}", ['user_id' => $user->id]);
+
+    return response()->json([
+        'success' => true,
+        'message' => "Compte {$action}.",
+        'data'    => $user,
+    ]);
+}
+
+public function destroy(User $user)
+{
+    // Empêcher de supprimer l'admin
+    if ($user->role === 'admin') {
+        return response()->json([
+            'success' => false,
+            'message' => 'Impossible de supprimer un administrateur.',
+        ], 422);
+    }
+
+    Log::info('🗑️ Compte supprimé', ['user_id' => $user->id]);
+
+    $user->delete();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Compte supprimé.',
+    ]);
+}
 
     /* ═══════════════════════════════════════════════════════
        DÉPARTEMENTS

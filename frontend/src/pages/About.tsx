@@ -19,7 +19,6 @@ const About: React.FC = () => {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#fff' }}>
-      <Navbar />
       <Content>
         {/* --- SECTION HERO --- */}
         <div style={{ 

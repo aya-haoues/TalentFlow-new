@@ -3,12 +3,15 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Departement extends Model
 {
     // ✅ Table au pluriel (anglais)
+    protected $connection = 'mongodb';
+    protected $collection = 'departments';
+
     protected $table = 'departments';
     
     protected $fillable = ['nom', 'description', 'created_by'];

@@ -203,19 +203,19 @@ export default function RhJobsPage() {
                   description={
                     <Space direction="vertical" size={4} style={{ marginTop: 4 }}>
                       <Space size={24} style={{ fontSize: 13 }}>
-                        <Text type="secondary">🏢 {job.department?.nom ?? 'Non assigné'}</Text>
-                        <Text type="secondary">💼 {job.type_contrat}</Text>
+                        <Text type="secondary">{job.department?.nom ?? 'Non assigné'}</Text>
+                        <Text type="secondary">{job.type_contrat}</Text>
                         <Text type="secondary">
-                          📍 {{ remote: '🏠 Remote', hybrid: '🔄 Hybride', onsite: '🏢 Sur site' }[job.type_lieu]}
+                          📍 {{ remote: 'Remote', hybrid: 'Hybride', onsite: 'Sur site' }[job.type_lieu]}
                         </Text>
                       </Space>
                       <Space size={24} style={{ fontSize: 13 }}>
-                        <Text type="secondary">📩 {job.applications_count ?? 0} candidature{job.applications_count !== 1 ? 's' : ''}</Text>
+                        <Text type="secondary">{job.applications_count ?? 0} candidature{job.applications_count !== 1 ? 's' : ''}</Text>
                         {job.date_limite && (
-                          <Text type="secondary">📅 {new Date(job.date_limite).toLocaleDateString('fr-FR')}</Text>
+                          <Text type="secondary">{new Date(job.date_limite).toLocaleDateString('fr-FR')}</Text>
                         )}
                         {job.salaire_min && job.salaire_max && (
-                          <Text type="secondary">💰 {job.salaire_min} – {job.salaire_max} TND</Text>
+                          <Text type="secondary">{job.salaire_min} – {job.salaire_max} TND</Text>
                         )}
                       </Space>
                     </Space>
