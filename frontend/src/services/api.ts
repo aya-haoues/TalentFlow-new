@@ -11,11 +11,12 @@ import type {
 } from '../types';
 
 // 🎯 Création de l'instance Axios centralisée
-// src/services/api.ts
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,  // Doit être http://localhost:8000/api
-  headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-  withCredentials: false, // ✅ false : on utilise Bearer token, pas cookies
+  baseURL: 'http://localhost:8000/api',
+  headers: {
+    'Accept': 'application/json', // <--- INDISPENSABLE
+    'Content-Type': 'application/json',
+  }
 });
 
 // 🛡️ INTERCEPTEUR DE REQUÊTE

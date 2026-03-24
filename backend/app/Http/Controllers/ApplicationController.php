@@ -188,16 +188,53 @@ class ApplicationController extends Controller
         ]);
     }
 
+    public function getStats()
+{
+    // Correction : s'assurer que l'on compte bien la collection MongoDB
+    $stats = [
+        // Utilisez 'total_applications' car c'est ce que votre hook useApplications attend
+        'total_applications' => \App\Models\Application::count(), 
+        'en_attente'         => \App\Models\Application::where('statut', 'en_attente')->count(),
+        'acceptee'           => \App\Models\Application::where('statut', 'acceptee')->count(),
+        'refusee'            => \App\Models\Application::where('statut', 'refusee')->count(),
+        'en_cours'           => \App\Models\Application::where('statut', 'en_cours')->count(),
+        'new_this_week'      => \App\Models\Application::where('created_at', '>=', now()->subDays(7))->count(),
+        'total_jobs_active'  => \App\Models\Job::where('is_accepting', true)->count(),
+    ];
+
+    return response()->json([
+        'success' => true,
+        'data' => $stats
+    ]);
+}
+
 public function indexRh(Request $request)
 {
-    // On récupère TOUTES les candidatures de la base, sans exception
-    $applications = \App\Models\Application::with(['job', 'candidate'])
-        ->orderBy('created_at', 'desc')
-        ->paginate(10);
+    $query = \App\Models\Application::with(['job', 'candidate']);
 
-    // Si même ici c'est vide, c'est que la collection 'applications' est vide dans MongoDB
+    // Filtre de recherche (Nom/Prénom ou Titre du Job)
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function($q) use ($search) {
+            $q->whereHas('candidate', function($c) use ($search) {
+                $c->where('nom', 'like', "%$search%")->orWhere('prenom', 'like', "%$search%");
+            })->orWhereHas('job', function($j) use ($search) {
+                $j->where('title', 'like', "%$search%");
+            });
+        });
+    }
+
+    // Filtre de statut
+    if ($request->filled('statut') && $request->statut !== 'all') {
+        $query->where('statut', $request->statut); // Changé 'status' en 'statut'
+    }
+
+    $applications = $query->orderBy('created_at', 'desc')->paginate(15);
+
+    // Retourne les données via une Resource pour un format JSON propre
     return ApplicationResource::collection($applications);
 }
+
 
     public function showRh(Application $application): JsonResponse
     {
@@ -253,11 +290,11 @@ public function indexRh(Request $request)
             $applications = Application::whereIn('job_id', $jobIds)->get(['statut']);
 
             return [
-                'total'      => $applications->count(),
-                'en_attente' => $applications->where('statut', 'en_attente')->count(),
-                'acceptee'   => $applications->where('statut', 'acceptee')->count(),
-                'en_cours'   => $applications->where('statut', 'en_cours')->count(),
-                'refusee'    => $applications->where('statut', 'refusee')->count(),
+                'total_applications' => $applications->count(), // Changé 'total' en 'total_applications'
+                'en_attente'         => $applications->where('statut', 'en_attente')->count(),
+                'acceptee'           => $applications->where('statut', 'acceptee')->count(),
+                'en_cours'           => $applications->where('statut', 'en_cours')->count(),
+                'refusee'            => $applications->where('statut', 'refusee')->count(),
             ];
         });
 

@@ -1,23 +1,20 @@
 // src/pages/candidat/CandidatDashboard.tsx
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col, Card, Statistic, Alert, Button, Typography, message } from 'antd';
+import { Row, Col, Card, Statistic, Alert, Button, Typography } from 'antd';
 import {
   FileTextOutlined, ClockCircleOutlined, UserOutlined,
-  CheckCircleOutlined, RiseOutlined, MailOutlined,
+  CheckCircleOutlined, RiseOutlined,
 } from '@ant-design/icons';
 import Navbar from '../../components/layout/Navbar';
 import ApplicationsList from '../../components/candidat/ApplicationsList';
 import DashboardSidebar from '../../components/candidat/DashboardSidebar';
 import { useDashboard } from '../../hooks/useDashboard';
 import { THEME } from '../../components/candidat/dashboardConfig';
-import { authService } from '../../services/api'; // ← ton service API existant
 
 const { Title, Text } = Typography;
 
 export default function CandidatDashboard() {
   const navigate = useNavigate();
-  const [resending, setResending] = useState(false);
 
   const {
     loading, applications, stats, pagination, user,
@@ -27,18 +24,7 @@ export default function CandidatDashboard() {
     handlePageChange, handleRefresh,
   } = useDashboard();
 
-  // ── Renvoyer l'email de vérification ──────────────
-  const handleResendVerification = async () => {
-    setResending(true);
-    try {
-      await authService.resendVerificationEmail();
-      message.success('Email de vérification envoyé ! Vérifiez votre boîte mail.');
-    } catch {
-      message.error('Erreur lors de l\'envoi. Réessayez dans quelques minutes.');
-    } finally {
-      setResending(false);
-    }
-  };
+  // ── LOGIQUE DE VÉRIFICATION EMAIL SUPPRIMÉE ICI ──────────────
 
   return (
     <>
@@ -57,47 +43,15 @@ export default function CandidatDashboard() {
             </Text>
           </div>
 
-          {/* ── Bandeau vérification email ─────────── */}
-          {user && !user.email_verified_at && (
-            <Alert
-              style={{ marginBottom: 24, borderRadius: THEME.cardRadius }}
-              icon={<MailOutlined />}
-              showIcon
-              type="warning"
-              message="Vérifiez votre adresse email"
-              description={
-                <span>
-                  Un email de vérification a été envoyé à{' '}
-                  <strong>{user.email}</strong>.
-                  Vérifiez votre boîte mail et cliquez sur le lien pour
-                  activer toutes les fonctionnalités.
-                </span>
-              }
-              action={
-                <Button
-                  size="small"
-                  loading={resending}
-                  icon={<MailOutlined />}
-                  onClick={handleResendVerification}
-                  style={{
-                    backgroundColor: '#fa8c16',
-                    borderColor: '#fa8c16',
-                    color: '#fff',
-                  }}
-                >
-                  Renvoyer l'email
-                </Button>
-              }
-            />
-          )}
+          {/* ── BANDEAU VÉRIFICATION SUPPRIMÉ D'ICI ─────────── */}
 
           {/* ── Stats ─────────────────────────────── */}
           <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
             {[
               { label: 'Total candidatures', value: stats.total,      color: THEME.primaryDark, icon: <FileTextOutlined style={{ color: THEME.primary }} />,   sub: 'Toutes offres confondues' },
               { label: 'En attente',         value: stats.en_attente, color: '#1890ff',          icon: <ClockCircleOutlined style={{ color: '#1890ff' }} />,     sub: "En cours d'examen"        },
-              { label: 'En entretien',       value: stats.en_cours,   color: '#722ed1',          icon: <UserOutlined style={{ color: '#722ed1' }} />,            sub: 'Entretiens planifiés'     },
-              { label: 'Acceptées',          value: stats.acceptee,   color: '#52c41a',          icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,     sub: 'Félicitations ! 🎉'       },
+              { label: 'En entretien',       value: stats.en_cours,   color: '#722ed1',          icon: <UserOutlined style={{ color: '#722ed1' }} />,            sub: 'Entretiens planifiés'      },
+              { label: 'Acceptées',          value: stats.acceptee,   color: '#52c41a',          icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,     sub: 'Félicitations ! 🎉'        },
             ].map((s) => (
               <Col xs={24} sm={12} md={6} key={s.label}>
                 <Card
@@ -121,7 +75,6 @@ export default function CandidatDashboard() {
 
           {/* ── Contenu principal ─────────────────── */}
           <Row gutter={[24, 24]}>
-
             <Col xs={24} lg={16}>
               <ApplicationsList
                 applications={applications}
@@ -170,7 +123,6 @@ export default function CandidatDashboard() {
             <Col xs={24} lg={8}>
               <DashboardSidebar user={user} stats={stats} />
             </Col>
-
           </Row>
         </div>
       </div>

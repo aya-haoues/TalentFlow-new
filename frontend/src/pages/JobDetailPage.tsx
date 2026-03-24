@@ -118,12 +118,14 @@ useEffect(() => {
   
 const handleApply = () => {
   const user = authService.getCurrentUser();
+
+  // 1. Si pas connecté -> Direction Login
   if (!user) {
-    // Rediriger vers login avec l'URL de retour
     navigate('/login', { state: { from: `/jobs/${id}/apply` } });
     return;
   }
-  // Si déjà connecté, aller directement à la page de candidature
+
+  // 3. Si tout est OK -> On postule
   navigate(`/jobs/${id}/apply`);
 };
 

@@ -80,13 +80,25 @@ export default function Register() {
     setLoading(true);
     try {
       const response = await fetch(`http://localhost:8000${cfg.endpoint}`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(values),
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json' // Crucial pour éviter le HTML en retour
+        },
+        body: JSON.stringify(values),
       });
 
       const data = await response.json();
-      if (!data.success) throw new Error(data.message || "Erreur d'inscription");
+
+      // Si erreur 422 ou 500, Laravel renvoie un message dans data
+      if (!response.ok) {
+        // Si c'est une erreur de validation (422), on affiche le premier message
+        if (data.errors) {
+          const firstError = Object.values(data.errors)[0] as string[];
+          throw new Error(firstError[0]);
+        }
+        throw new Error(data.message || "Erreur serveur (500)");
+      }
 
       message.success(
         currentRole === 'candidat'
@@ -101,8 +113,9 @@ export default function Register() {
       } else {
         navigate(cfg.redirectTo);
       }
-    } catch (error: unknown) {
-      message.error(error instanceof Error ? error.message : "Erreur lors de l'inscription");
+    } catch (error: any) {
+      console.error("Erreur complète:", error);
+      message.error(error.message || "Erreur lors de l'inscription");
     } finally {
       setLoading(false);
     }

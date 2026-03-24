@@ -64,26 +64,38 @@ export function useApplications(): UseApplicationsReturn {
   };
 
   const fetchApplications = useCallback(async (page = 1) => {
-    setLoading(true);
-    try {
-      const params: Record<string, string> = {
-        page:     String(page),
-        per_page: '15',
-      };
-      if (searchQuery)            params.search = searchQuery;
-      if (statusFilter !== 'all') params.statut = statusFilter;
+  setLoading(true);
+  try {
+    const params: any = { 
+      page: String(page), 
+      per_page: '15' 
+    };
+    if (searchQuery) params.search = searchQuery;
+    if (statusFilter !== 'all') params.statut = statusFilter;
 
-      const res = await api.get('/rh/applications', { params });
-      if (res.data.success) {
-        setApplications(res.data.data);
-        setPagination(res.data.pagination ?? DEFAULT_PAGINATION);
+    const res = await api.get('/rh/applications', { params });
+    
+    // CORRECTION : Laravel Resource place les données dans res.data.data
+    if (res.data && res.data.data) {
+      setApplications(res.data.data);
+      
+      // Mise à jour de la pagination depuis l'objet meta de Laravel
+      if (res.data.meta) {
+        setPagination({
+          current_page: res.data.meta.current_page,
+          last_page:    res.data.meta.last_page,
+          total:        res.data.meta.total,
+          per_page:     res.data.meta.per_page,
+        });
       }
-    } catch {
-      message.error('Erreur lors du chargement des candidatures');
-    } finally {
-      setLoading(false);
     }
-  }, [searchQuery, statusFilter]);
+  } catch (error) {
+    message.error('Erreur lors du chargement des candidatures');
+  } finally {
+    setLoading(false);
+  }
+}, [searchQuery, statusFilter]);
+
 
   // Chargement initial
   useEffect(() => { fetchStats(); }, []);

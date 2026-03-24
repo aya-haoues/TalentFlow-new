@@ -25,7 +25,7 @@ interface User {
   is_approved: boolean;
   is_blocked:  boolean;
   telephone:   string | null;
-  departement: string | null;
+  department: string | null;
   avatar:      string | null;
   created_at:  string;
 }
@@ -58,9 +58,10 @@ export default function UsersManagement() {
     setLoading(true);
     try {
       const params: Record<string, string> = { page: String(page), per_page: '15' };
-      if (search)               params.search = search;
-      if (roleFilter   !== 'all') params.role   = roleFilter;
-      if (statusFilter !== 'all') params.status = statusFilter;
+if (search) params.search = search;
+// On n'ajoute le paramètre QUE si ce n'est pas "all"
+if (roleFilter && roleFilter !== 'all') params.role = roleFilter; 
+if (statusFilter && statusFilter !== 'all') params.status = statusFilter;
 
       const res = await api.get('/admin/users', { params });
       if (res.data?.success) {
@@ -167,10 +168,10 @@ export default function UsersManagement() {
     },
     {
       title:  'Département',
-      key:    'departement',
+      key:    'department',
       width:  130,
-      render: (_, u) => u.departement
-        ? <Tag>{u.departement}</Tag>
+      render: (_, u) => u.department
+        ? <Tag>{u.department}</Tag>
         : <Text type="secondary">—</Text>,
     },
     {
@@ -271,28 +272,32 @@ export default function UsersManagement() {
           <Option value="pending">En attente</Option>
           <Option value="blocked">Bloqués</Option>
         </Select>
+
+        {/* 3. CORRECTION CRITIQUE : Ligne 275 blindée */}
         <Text type="secondary" style={{ fontSize: 13 }}>
-          {pagination.total} utilisateur{pagination.total > 1 ? 's' : ''}
+          {(pagination?.total ?? 0)} utilisateur{(pagination?.total ?? 0) > 1 ? 's' : ''}
         </Text>
       </Space>
 
       {/* ── Tableau ── */}
       <Table
         columns={columns}
-        dataSource={users}
+        dataSource={users || []} // Sécurité supplémentaire
         loading={loading}
         rowKey="id"
         scroll={{ x: 900 }}
         locale={{ emptyText: 'Aucun utilisateur trouvé' }}
         pagination={{
-          current:   pagination.current_page,
-          total:     pagination.total,
-          pageSize:  pagination.per_page,
-          onChange:  fetchUsers,
+          // 4. CORRECTION : Pagination sécurisée pour Ant Design
+          current: pagination?.current_page ?? 1,
+          total: pagination?.total ?? 0,
+          pageSize: pagination?.per_page ?? 15,
+          onChange: (page) => fetchUsers(page),
           showTotal: (total) => `${total} utilisateurs`,
           showSizeChanger: false,
         }}
       />
     </AdminLayout>
   );
+
 }

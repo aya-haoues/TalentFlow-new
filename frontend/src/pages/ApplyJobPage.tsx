@@ -140,57 +140,87 @@ const ApplyJobPage: React.FC = () => {
   const collapseAll = () => setActiveKeys([]);
 
   /* ── Soumission ──────────────────────────────────────── */
+  /* ── Soumission Corrigée ──────────────────────────────── */
   const onFinish = async (values: ApplicationFormValues) => {
-    if (!id) { message.error("ID de l'offre manquant"); return; }
+    if (!id) { 
+      message.error("ID de l'offre manquant"); 
+      return; 
+    }
 
     const uploadedFile = cvFileList[cvFileList.length - 1];
     const cvFile = uploadedFile?.originFileObj;
-    if (!cvFile) { message.error('Veuillez joindre votre CV au format PDF'); return; }
-    if (cvFile.type !== 'application/pdf') { message.error('Le CV doit être au format PDF'); return; }
-    if (cvFile.size > 5 * 1024 * 1024) { message.error('Le CV ne doit pas dépasser 5 Mo'); return; }
+    
+    if (!cvFile) { 
+      message.error('Veuillez joindre votre CV au format PDF'); 
+      return; 
+    }
 
     setLoading(true);
     try {
       const fd = new FormData();
+      
+      // 1. Informations de base de l'offre
       fd.append('job_id', id);
-      fd.append('why_us', values.why_us?.trim() ?? '');
+      // Correction Erreur "motivation is required"
+      fd.append('motivation', values.why_us?.trim() ?? ''); 
+      // Correction Erreur "contract type preferred is required"
       fd.append('contract_type_preferred', values.contract_type ?? '');
+      
+      // 2. Fichier CV
       fd.append('cv', cvFile, cvFile.name);
 
+      // 3. Informations Personnelles
       const pi = values.personal_info;
       if (pi) {
-        if (pi.nom?.trim())          fd.append('nom',          pi.nom.trim());
-        if (pi.prenom?.trim())       fd.append('prenom',       pi.prenom.trim());
-        if (pi.email?.trim())        fd.append('email',        pi.email.trim());
-        if (pi.telephone?.trim())    fd.append('telephone',    pi.telephone.trim());
-        if (pi.genre)                fd.append('genre',        pi.genre);
-        if (pi.nationalite?.trim())  fd.append('nationalite',  pi.nationalite.trim());
+        if (pi.nom?.trim())       fd.append('nom', pi.nom.trim());
+        if (pi.prenom?.trim())    fd.append('prenom', pi.prenom.trim());
+        if (pi.email?.trim())     fd.append('email', pi.email.trim());
+        if (pi.telephone?.trim())  fd.append('telephone', pi.telephone.trim());
+        if (pi.genre)             fd.append('genre', pi.genre);
+        if (pi.nationalite?.trim()) fd.append('nationalite', pi.nationalite.trim());
         if (pi.linkedin_url?.trim()) fd.append('linkedin_url', pi.linkedin_url.trim());
-        if (pi.github_url?.trim())   fd.append('github_url',   pi.github_url.trim());
-        if (pi.site_web?.trim())     fd.append('site_web',     pi.site_web.trim());
+        if (pi.github_url?.trim())   fd.append('github_url', pi.github_url.trim());
+        if (pi.site_web?.trim())     fd.append('site_web', pi.site_web.trim());
+        
         const dn = dayjsToString(pi.date_naissance);
         if (dn) fd.append('date_naissance', dn);
-        if (pi.adresse && Object.values(pi.adresse).some(v => v?.trim()))
-          fd.append('adresse', JSON.stringify(pi.adresse));
+
+        // Correction Erreur "adresse must be an array"
+        if (pi.adresse) {
+            // On envoie chaque sous-champ avec l'index [0] pour simuler un premier élément de tableau
+            if (pi.adresse.rue)         fd.append('adresse[0][rue]', pi.adresse.rue);
+            if (pi.adresse.ville)       fd.append('adresse[0][ville]', pi.adresse.ville);
+            if (pi.adresse.code_postal) fd.append('adresse[0][code_postal]', pi.adresse.code_postal);
+            if (pi.adresse.pays)        fd.append('adresse[0][pays]', pi.adresse.pays);
+        }
       }
 
-      if (values.handicap?.trim()) fd.append('handicap_info', values.handicap.trim());
+      // 4. Champs complémentaires
+      if (values.handicap?.trim()) {
+        fd.append('handicap_info', values.handicap.trim());
+      }
 
+      // 5. Tableaux (Expériences, Formations, Skills, Challenges)
+      // Utilisation de ta fonction helper appendIfNotEmpty
       appendIfNotEmpty(fd, 'experiences', values.experiences as Record<string, unknown>[]);
       appendIfNotEmpty(fd, 'formations',  values.formations  as Record<string, unknown>[]);
       appendIfNotEmpty(fd, 'skills',      values.skills      as Record<string, unknown>[]);
       appendIfNotEmpty(fd, 'challenges',  values.challenges  as Record<string, unknown>[]);
 
+      // 6. Envoi API
       await api.post('/applications', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+          'Accept': 'application/json' 
+        },
         timeout: 30000,
       });
 
       Modal.success({
-        title:   'Candidature envoyée ! 🎉',
-        content: `Votre candidature pour "${jobTitle}" a bien été transmise.`,
-        okText:  'Voir mon tableau de bord',
-        onOk:    () => navigate('/candidat/dashboard'),
+        title: 'Candidature envoyée ! 🎉',
+        content: `Votre candidature pour "${jobTitle}" a bien été transmise à l'équipe RH.`,
+        okText: 'Voir mon tableau de bord',
+        onOk: () => navigate('/candidat/dashboard'),
       });
 
       form.resetFields();
@@ -199,26 +229,29 @@ const ApplyJobPage: React.FC = () => {
     } catch (error: unknown) {
       if (error instanceof AxiosError) {
         const status = error.response?.status;
-        const data   = error.response?.data;
+        const data = error.response?.data;
+
         if (status === 422 && data?.errors) {
+          // Affiche chaque erreur de validation retournée par Laravel
           Object.entries(data.errors as Record<string, string[]>).forEach(([field, msgs]) => {
             message.error(`${field.replace(/_/g, ' ')} : ${msgs[0]}`);
           });
         } else if (status === 401) {
-          message.error('Session expirée.');
-          navigate('/login', { state: { from: `/jobs/${id}/apply` } });
+          message.error('Votre session a expiré. Veuillez vous reconnecter.');
+          navigate('/login');
         } else if (status === 409) {
           message.warning('Vous avez déjà postulé à cette offre.');
         } else {
-          message.error(data?.message ?? "Erreur lors de l'envoi.");
+          message.error(data?.message ?? "Une erreur est survenue lors de l'envoi.");
         }
       } else {
-        message.error('Une erreur inattendue est survenue.');
+        message.error('Erreur de connexion au serveur.');
       }
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleBack = () => {
     if (form.isFieldsTouched()) {

@@ -89,22 +89,22 @@ class AuthService
        ═══════════════════════════════════════════════════════ */
 
     public function registerCandidat(array $data): array
-    {
-        $user = User::create([
-            'name'         => $data['name'],        // ✅ trim() géré par mutator
-            'email'        => $data['email'],        // ✅ strtolower+trim géré par mutator
-            'password'     => $data['password'],     // ✅ hashed géré par cast
-            'role'         => 'candidat',
-            'telephone'    => $data['telephone'] ?? null,
-            'linkedin_url' => $data['linkedin_url'] ?? null,
-        ]);
+{
+    $user = User::create([
+        'name'         => $data['name'],
+        'email'        => $data['email'],
+        'password'     => $data['password'], 
+        'role'         => 'candidat',
+        'telephone'    => $data['telephone'] ?? null,
+        'linkedin_url' => $data['linkedin_url'] ?? null,
+        'email_verified_at' => now(), // ✅ Forcez la date de vérification à "maintenant"
+    ]);
 
-        event(new Registered($user));
+    Log::info('✅ Candidat créé et email de vérification déclenché', ['user_id' => $user->id]);
 
-        Log::info('✅ Candidat créé', ['user_id' => $user->id]);
+    return $this->makeTokenPayload($user);
+}
 
-        return $this->makeTokenPayload($user);
-    }
 
     public function registerRh(array $data): array
     {

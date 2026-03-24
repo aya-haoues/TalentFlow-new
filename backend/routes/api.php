@@ -10,22 +10,9 @@ use App\Http\Controllers\CandidatController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\PasswordResetController;  // ← ajouter l'import
 use App\Http\Controllers\EmailVerificationController;  // ← ajouter l'import
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
 
-// ── Vérification Email ────────────────────────────────
-Route::get('/email/verify',
-    [EmailVerificationController::class, 'notice'])
-    ->middleware('auth.mongo')
-    ->name('verification.notice');
 
-Route::get('/email/verify/{id}/{hash}',
-    [EmailVerificationController::class, 'verify'])
-    ->middleware(['auth.mongo', 'signed'])
-    ->name('verification.verify');
-
-Route::post('/email/resend-verification',
-    [EmailVerificationController::class, 'resend'])
-    ->middleware(['auth.mongo', 'throttle:6,1'])
-    ->name('verification.send');
 
 
 // ── Mot de passe oublié ────────────────────────────────
@@ -138,7 +125,5 @@ Route::fallback(function () {
     ], 404);
 });
 
-// routes/api.php
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/email/resend-verification', [EmailVerificationController::class, 'resend']);
-});
+
+

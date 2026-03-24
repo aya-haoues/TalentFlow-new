@@ -4,7 +4,6 @@ namespace App\Models;
 
 // ── Imports Laravel ───────────────────────────────
 use MongoDB\Laravel\Auth\User as Authenticatable;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -19,7 +18,7 @@ use Laravel\Sanctum\NewAccessToken;
 use App\Models\Application;
 use App\Models\Job;
 
-class User extends Authenticatable implements MustVerifyEmail, CanResetPassword
+class User extends Authenticatable implements CanResetPassword
 {
     use HasFactory, Notifiable;
 
@@ -154,4 +153,11 @@ class User extends Authenticatable implements MustVerifyEmail, CanResetPassword
         return $this->hasOne(Application::class, 'candidate_id')
                     ->ofMany('ai_score', 'max');
     }
+
+    public function getKey()
+{
+    return (string) $this->_id;
+}
+
+
 }

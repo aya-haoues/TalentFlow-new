@@ -1,5 +1,5 @@
 // src/components/layout/AdminLayout.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Layout, ConfigProvider, Typography, Space,
@@ -37,6 +37,15 @@ export default function AdminLayout({ children, title, description }: AdminLayou
   const navigate             = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const user = authService.getCurrentUser() as User;
+
+  // AJOUTE CECI : Si pas d'utilisateur, on redirige avant de rendre le reste
+  useEffect(() => {
+    if (!user) {
+      navigate('/login/admin');
+    }
+  }, [user, navigate]);
+
+  if (!user) return null; // Empêche le crash du rendu
 
   const { token }    = theme.useToken();
   const primaryColor = '#00a89c';
