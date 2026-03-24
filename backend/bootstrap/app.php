@@ -18,6 +18,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,    // utilisé via 'role:admin'
+            'auth.mongo' => \App\Http\Middleware\MongoTokenAuth::class,  // ← ajouter
+
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

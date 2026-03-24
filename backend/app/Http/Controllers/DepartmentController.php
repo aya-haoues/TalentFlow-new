@@ -2,31 +2,31 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
-use App\Models\Departement;
+use App\Models\Department;
 use Illuminate\Http\Request;
+use App\Http\Resources\DepartmentResource;
+use Illuminate\Support\Facades\DB;
+
 
 class DepartmentController extends Controller
 {
     /**
      * LISTE des départements
-     * GET /api/departments
-     * Utile pour : Remplir le <select> dans le formulaire de création d'offre
+     * Test Postman 1.1 — GET /api/departments
      */
-    public function index()
-    {
-        $departments = Departement::orderBy('nom')->get();
+    // Remplace Departement par Department
 
-        return response()->json([
-            'success' => true,
-            'data' => $departments
-        ]);
-    }
+public function index()
+{
+    // Utilise le nouveau nom du modèle
+    $departments = Department::orderBy('nom')->get();
+
+    return \App\Http\Resources\DepartmentResource::collection($departments);
+}
 
     /**
      * CRÉER un département
-     * POST /api/departments
-     * Réservé aux Super-Admin ou RH Senior
+     * Test Postman 2.5 — POST /api/admin/departments
      */
     public function store(Request $request)
     {
@@ -35,54 +35,62 @@ class DepartmentController extends Controller
             'description' => 'nullable|string'
         ]);
 
-        $dept = Departement::create($validated);
+        $dept = Department::create($validated);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Département créé',
-            'data' => $dept
-        ], 201);
+        return (new DepartmentResource($dept))
+            ->additional([
+                'success' => true,
+                'message' => 'Département créé avec succès'
+            ])
+            ->response()
+            ->setStatusCode(201);
     }
 
     /**
      * AFFICHER un département
      * GET /api/departments/{id}
      */
-    public function show(Departement $department)
+    public function show($id)
     {
-        return response()->json([
-            'success' => true,
-            'data' => $department->load('jobs') // Charge aussi les offres de ce département
-        ]);
+        // Avec MongoDB, on utilise souvent findOrFail sur l'ID
+        $department = Department::findOrFail($id);
+        
+        // On charge la relation jobs pour le détail
+        $department->load('jobs');
+
+        return new DepartmentResource($department);
     }
 
     /**
      * MODIFIER un département
-     * PUT /api/departments/{id}
+     * Test Postman 2.6 — PUT /api/admin/departments/{id}
      */
-    public function update(Request $request, Departement $department)
+    public function update(Request $request, $id)
     {
+        $department = Department::findOrFail($id);
+
         $validated = $request->validate([
-            'nom' => 'sometimes|required|string|max:100|unique:departments,nom,' . $department->id,
+            // Laravel-MongoDB gère bien l'ID pour l'unique
+            'nom' => 'sometimes|required|string|max:100|unique:departments,nom,' . $id . ',_id',
             'description' => 'nullable|string'
         ]);
 
         $department->update($validated);
 
-        return response()->json([
+        return (new DepartmentResource($department))->additional([
             'success' => true,
-            'message' => 'Département mis à jour',
-            'data' => $department
+            'message' => 'Département mis à jour'
         ]);
     }
 
     /**
      * SUPPRIMER un département
-     * DELETE /api/departments/{id}
+     * Test Postman 2.7 — DELETE /api/admin/departments/{id}
      */
-    public function destroy(Departement $department)
+    public function destroy($id)
     {
-        // ⚠️ Sécurité : On ne peut pas supprimer un département qui a des offres
+        $department = Department::findOrFail($id);
+
         if ($department->jobs()->count() > 0) {
             return response()->json([
                 'success' => false,
@@ -94,7 +102,7 @@ class DepartmentController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Département supprimé'
+            'message' => 'Département supprimé avec succès.'
         ]);
     }
 }

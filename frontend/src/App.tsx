@@ -6,7 +6,7 @@ import frFR from 'antd/locale/fr_FR';
 
 // ── Layouts ──────────────────────────────────────────────
 import Navbar from './components/layout/Navbar';
-
+import VerifyEmail from './pages/VerifyEmail';
 // ── Pages publiques ──────────────────────────────────────
 import Home            from './pages/Home';
 import About           from './pages/About';
@@ -97,6 +97,10 @@ const App: React.FC = () => (
 
         {/* ── Fallback ────────────────────────────────── */}
         <Route path="*" element={<Navigate to="/" replace />} />
+
+
+<Route path="/verify-email" element={<VerifyEmail />} />
+
 
       </Routes>
     </Router>

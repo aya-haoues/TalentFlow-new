@@ -2,103 +2,82 @@
 
 namespace App\Http\Controllers;
 
+use MongoDB\BSON\Regex;
 use App\Models\User;
 use App\Models\Job;
 use App\Models\Application;
+use App\Models\Department;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use App\Http\Resources\UserResource;
 
 class AdminController extends Controller
 {
-    
-    public function stats()
-    {
+    /* ═══════════════════════════════════════════════════════
+       STATS
+    ═══════════════════════════════════════════════════════ */
+
+   public function stats()
+{
+    try {
+        // Astuce : Utiliser des requêtes brutes ou s'assurer que le model utilise bien le driver MongoDB
         return response()->json([
             'success' => true,
             'data'    => [
-                'total_users'        => User::where('role', '!=', 'admin')->count(),
-                'total_candidats'    => User::where('role', 'candidat')->count(),
-                'total_rh'           => User::where('role', 'rh')->count(),
-                'total_managers'     => User::where('role', 'manager')->count(),
-                'total_departments'  => \App\Models\Departement::count(),
-                'total_jobs'         => Job::count(),
-                'total_applications' => Application::count(),
-                'pending_approvals'  => User::whereIn('role', ['rh', 'manager'])
-                                            ->where('is_approved', false)
-                                            ->count(),
+                // On vérifie que les modèles sont bien chargés
+                'total_users'        => \App\Models\User::where('role', '!=', 'admin')->count(),
+                'total_candidats'    => \App\Models\User::where('role', 'candidat')->count(),
+                'total_rh'           => \App\Models\User::where('role', 'rh')->count(),
+                'total_managers'     => \App\Models\User::where('role', 'manager')->count(),
+                'total_departments'  => \App\Models\Department::count(),
+                'total_jobs'         => \App\Models\Job::count(),
+                'total_applications' => \App\Models\Application::count(),
+                
+                // Attention : 'whereIn' + 'where' fonctionne sur MongoDB, mais vérifie les types de données
+                'pending_approvals'  => \App\Models\User::whereIn('role', ['rh', 'manager'])
+                                                    ->where('is_approved', false)
+                                                    ->count(),
             ],
         ]);
-    }
+    } catch (\Exception $e) {
+    dd($e->getMessage());
+}
+}
+    /* ═══════════════════════════════════════════════════════
+       LISTER LES USERS
+    ═══════════════════════════════════════════════════════ */
 
-    
     public function index(Request $request)
-    {
-        $query = User::where('role', '!=', 'admin')
-                     ->orderBy('created_at', 'desc');
-        log($query);
-        
-        // Filtre rôle
-        if ($request->filled('role') && $request->role !== 'all') {
-            $query->where('role', $request->role);
-        }
+{
+    $users = User::where('role', '!=', 'admin')->paginate(15);
 
-        // Filtre statut
-        if ($request->filled('status')) {
-            if ($request->status === 'blocked') {
-                $query->where('is_blocked', true);
-            } elseif ($request->status === 'pending') {
-                $query->whereIn('role', ['rh', 'manager'])->where('is_approved', false);
-            } elseif ($request->status === 'active') {
-                $query->where('is_blocked', false)
-                      ->where(function ($q) {
-                          $q->where('role', 'candidat')
-                            ->orWhere('is_approved', true);
-                      });
-            }
-        }
-
-        // Recherche
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name',  'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
-
-        $users = $query->paginate($request->get('per_page', 15));
-
-        return response()->json([
-            'success'    => true,
-            'data'       => $users->items(),
-            'pagination' => [
-                'current_page' => $users->currentPage(),
-                'last_page'    => $users->lastPage(),
-                'total'        => $users->total(),
-                'per_page'     => $users->perPage(),
-            ],
-        ]);
-    }
+    // ✅ Utilise UserResource pour éviter les erreurs de formatage
+    return UserResource::collection($users)
+        ->additional(['success' => true]);
+}
 
     /* ═══════════════════════════════════════════════════════
        COMPTES EN ATTENTE
     ═══════════════════════════════════════════════════════ */
 
     public function pending()
-    {
-        $users = User::whereIn('role', ['rh', 'manager'])
-                     ->where('is_approved', false)
-                     ->orderBy('created_at', 'desc')
-                     ->get();
+{
+    $users = User::whereIn('role', ['rh', 'manager'])
+                 ->where('is_approved', false)
+                 ->orderBy('created_at', 'desc')
+                 ->get();
 
-        return response()->json(['success' => true, 'data' => $users]);
-    }
+    // ✅ Utiliser UserResource
+    return UserResource::collection($users)
+        ->additional(['success' => true])
+        ->response();
+}
 
     /* ═══════════════════════════════════════════════════════
        APPROUVER
     ═══════════════════════════════════════════════════════ */
 
-    public function approve(User $user)  // ← Laravel injecte automatiquement
+    public function approve(User $user)
     {
         if (!in_array($user->role, ['rh', 'manager'])) {
             return response()->json([
@@ -114,81 +93,87 @@ class AdminController extends Controller
             'role'    => $user->role,
         ]);
 
-        return response()->json([
+        return (new UserResource($user))
+        ->additional([
             'success' => true,
             'message' => 'Compte approuvé.',
-            'data'    => $user,
-        ]);
+        ])
+        ->response();
     }
 
     /* ═══════════════════════════════════════════════════════
        REJETER
     ═══════════════════════════════════════════════════════ */
 
-    // ✅ Toutes avec Route Model Binding
+    public function reject(User $user)
+    {
+        if (!in_array($user->role, ['rh', 'manager'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Seuls les comptes RH et Manager nécessitent une approbation.',
+            ], 422);
+        }
 
-public function reject(User $user)
-{
-    if (!in_array($user->role, ['rh', 'manager'])) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Seuls les comptes RH et Manager nécessitent une approbation.',
-        ], 422);
+        $user->update(['is_approved' => false]);
+
+        Log::info('❌ Compte rejeté', ['user_id' => $user->id]);
+
+        return (new UserResource($user))
+        ->additional([
+            'success' => true,
+            'message' => 'Compte rejeté.',
+        ])
+        ->response();
     }
 
-    $user->update(['is_approved' => false]);
+    /* ═══════════════════════════════════════════════════════
+       BLOQUER / DÉBLOQUER
+    ═══════════════════════════════════════════════════════ */
 
-    Log::info('❌ Compte rejeté', ['user_id' => $user->id]);
+    public function toggleBlock(User $user)
+    {
+        if ($user->role === 'admin') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Impossible de bloquer un administrateur.',
+            ], 422);
+        }
 
-    return response()->json([
-        'success' => true,
-        'message' => 'Compte rejeté.',
-        'data'    => $user,
-    ]);
-}
+        $user->update(['is_blocked' => !$user->is_blocked]);
 
-public function toggleBlock(User $user)
-{
-    // Empêcher de bloquer l'admin
-    if ($user->role === 'admin') {
-        return response()->json([
-            'success' => false,
-            'message' => 'Impossible de bloquer un administrateur.',
-        ], 422);
+        $action = $user->is_blocked ? 'bloqué' : 'débloqué';
+
+        Log::info("🔒 Compte {$action}", ['user_id' => $user->id]);
+
+        return (new UserResource($user))
+        ->additional([
+            'success' => true,
+            'message' => "Compte {$action}.",
+        ])
+        ->response();
     }
 
-    $user->update(['is_blocked' => !$user->is_blocked]);
+    /* ═══════════════════════════════════════════════════════
+       SUPPRIMER
+    ═══════════════════════════════════════════════════════ */
 
-    $action = $user->is_blocked ? 'bloqué' : 'débloqué';
+    public function destroy(User $user)
+    {
+        if ($user->role === 'admin') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Impossible de supprimer un administrateur.',
+            ], 422);
+        }
 
-    Log::info("🔒 Compte {$action}", ['user_id' => $user->id]);
+        Log::info('🗑️ Compte supprimé', ['user_id' => $user->id]);
+        $user->delete();
 
-    return response()->json([
-        'success' => true,
-        'message' => "Compte {$action}.",
-        'data'    => $user,
-    ]);
-}
-
-public function destroy(User $user)
-{
-    // Empêcher de supprimer l'admin
-    if ($user->role === 'admin') {
         return response()->json([
-            'success' => false,
-            'message' => 'Impossible de supprimer un administrateur.',
-        ], 422);
+            'success' => true,
+            'message' => 'Compte supprimé.',
+        ]);
     }
-
-    Log::info('🗑️ Compte supprimé', ['user_id' => $user->id]);
-
-    $user->delete();
-
-    return response()->json([
-        'success' => true,
-        'message' => 'Compte supprimé.',
-    ]);
-}
 
     /* ═══════════════════════════════════════════════════════
        DÉPARTEMENTS
@@ -196,29 +181,71 @@ public function destroy(User $user)
 
     public function departments()
     {
-        $departments = \App\Models\Departement::withCount('jobs')->orderBy('nom')->get();
+        // ✅ withCount() pas supporté MongoDB → calcul manuel
+        $departments = Department::orderBy('nom')->get()->map(function ($dept) {
+            $dept->jobs_count = $dept->jobs()->count();
+            return $dept;
+        });
+
         return response()->json(['success' => true, 'data' => $departments]);
     }
 
     public function storeDepartment(Request $request)
     {
-        $request->validate(['nom' => 'required|string|max:100|unique:departments,nom']);
-        $dept = \App\Models\Departement::create(['nom' => trim($request->nom)]);
-        return response()->json(['success' => true, 'data' => $dept], 201);
+        $request->validate([
+            'nom'         => 'required|string|max:100|unique:departments,nom',
+            'description' => 'nullable|string',
+        ]);
+
+        $dept = Department::create([
+            'nom'         => trim($request->nom),
+            'description' => $request->description,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Département créé avec succès',
+            'data'    => $dept,
+        ], 201);
     }
 
     public function updateDepartment(Request $request, $id)
     {
-        $dept = \App\Models\Departement::findOrFail($id);
-        $request->validate(['nom' => "required|string|max:100|unique:departments,nom,{$id}"]);
-        $dept->update(['nom' => trim($request->nom)]);
-        return response()->json(['success' => true, 'data' => $dept]);
+        $dept = Department::findOrFail($id);
+
+        $request->validate([
+            'nom'         => "required|string|max:100|unique:departments,nom,{$id}",
+            'description' => 'nullable|string',
+        ]);
+
+        $dept->update([
+            'nom'         => trim($request->nom),
+            'description' => $request->description,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Département mis à jour',
+            'data'    => $dept,
+        ]);
     }
 
     public function destroyDepartment($id)
     {
-        $dept = \App\Models\Departement::findOrFail($id);
+        $dept = Department::findOrFail($id);
+
+        if ($dept->jobs()->count() > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Impossible de supprimer : des offres sont liées à ce département.',
+            ], 400);
+        }
+
         $dept->delete();
-        return response()->json(['success' => true, 'message' => 'Département supprimé.']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Département supprimé.',
+        ]);
     }
 }

@@ -2,127 +2,90 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\JobResource;
 use App\Models\Job;
+use App\Models\Department;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class JobController extends Controller
 {
-    /**
-     * Liste des offres publiées — publique
-     * GET /api/jobs
-     */
-    public function indexPublic(Request $request)
+    public function publicIndex(Request $request): JsonResponse
     {
-        $query = Job::query();
+        $jobs = Job::where('statut', 'publiee')
+                   ->where(function ($q) {
+                       $q->whereNull('date_limite')
+                         ->orWhere('date_limite', '>=', now());
+                   })
+                   ->with(['department'])
+                   ->latest()
+                   ->paginate(10);
 
-        if ($request->filled('type_contrat')) {
-            $query->where('type_contrat', $request->type_contrat);
-        }
-        if ($request->filled('niveau_experience')) {
-            $query->where('niveau_experience', $request->niveau_experience);
-        }
-        if ($request->filled('type_lieu')) {
-            $query->where('type_lieu', $request->type_lieu);
-        }
-        if ($request->filled('department_id')) {
-            $query->where('department_id', $request->department_id);
-        }
-        if ($request->filled('search')) {
-            $query->where(function ($q) use ($request) {
-                $q->where('titre', 'like', "%{$request->search}%")
-                  ->orWhere('description', 'like', "%{$request->search}%");
-            });
-        }
-
-        $jobs = $query->where('statut', 'publiee')
-                      ->with(['department'])
-                      ->latest()
-                      ->paginate(10);
-
-        return response()->json(['success' => true, 'data' => $jobs]);
+        return JobResource::collection($jobs)
+            ->additional(['success' => true])
+            ->response();
     }
 
-    /**
-     * Détail d'une offre publiée — publique
-     * GET /api/jobs/{id}
-     */
-    public function showPublic($id)
+    public function publicShow($id): JsonResponse
     {
-        $job = Job::with(['department'])
-                  ->where('id', $id)
-                  ->where('statut', 'publiee')
-                  ->first();
+        $job = Job::where('id', $id)->first();
 
-        if (!$job) {
+        if (!$job || !$job->is_published) {
             return response()->json([
                 'success' => false,
-                'message' => 'Offre non trouvée ou non publiée',
+                'message' => 'Offre non trouvée ou non publiée.',
             ], 404);
         }
 
-        return response()->json(['success' => true, 'data' => $job]);
+        $job->load(['department']);
+
+        return (new JobResource($job))
+            ->additional(['success' => true])
+            ->response();
     }
 
-    /**
-     * Liste des offres pour RH (tous statuts)
-     * GET /api/rh/jobs
-     */
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
-        // ✅ Policy viewAny
         $this->authorize('viewAny', Job::class);
 
-        $query = Job::query();
+        $jobs = Job::when($request->filled('statut'),
+                    fn($q) => $q->where('statut', $request->statut))
+                ->when($request->filled('type_contrat'),
+                    fn($q) => $q->where('type_contrat', $request->type_contrat))
+                ->when($request->filled('department_id'),
+                    fn($q) => $q->where('department_id', $request->department_id))
+                ->when($request->filled('niveau_experience'),
+                    fn($q) => $q->where('niveau_experience', $request->niveau_experience))
+                ->where('created_by', Auth::id()) // ← RH voit seulement ses offres
+                ->with(['department', 'creator'])
+                ->latest()
+                ->paginate(10);
 
-        if ($request->filled('statut')) {
-            $query->where('statut', $request->statut);
-        }
-        if ($request->filled('type_contrat')) {
-            $query->where('type_contrat', $request->type_contrat);
-        }
-        if ($request->filled('department_id')) {
-            $query->where('department_id', $request->department_id);
-        }
-        if ($request->filled('niveau_experience')) {
-            $query->where('niveau_experience', $request->niveau_experience);
-        }
-
-        $jobs = $query->with(['department', 'creator'])
-                      ->latest()
-                      ->paginate(10);
-
-        return response()->json(['success' => true, 'data' => $jobs]);
+        return JobResource::collection($jobs)
+            ->additional(['success' => true])
+            ->response();
     }
 
-    /**
-     * Détail d'une offre pour RH
-     * GET /api/rh/jobs/{job}
-     */
-    public function show(Job $job)
+    public function show(Job $job): JsonResponse
     {
-        // ✅ Policy view
         $this->authorize('view', $job);
-
         $job->load(['department', 'creator', 'applications']);
 
-        return response()->json(['success' => true, 'data' => $job]);
+        return (new JobResource($job))
+            ->additional(['success' => true])
+            ->response();
     }
 
-    /**
-     * Créer une offre
-     * POST /api/rh/jobs
-     */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
-        // ✅ Policy create
         $this->authorize('create', Job::class);
 
         try {
             $validated = $request->validate([
                 'titre'                  => 'required|string|max:255',
-                'department_id'          => 'required|exists:departments,id',
+                'department_id'          => 'required|string',
                 'type_contrat'           => 'required|in:CDI,CDD,Stage,Alternance,Freelance',
                 'niveau_experience'      => 'required|in:junior,confirme,senior',
                 'type_lieu'              => 'required|in:remote,hybrid,onsite',
@@ -133,44 +96,55 @@ class JobController extends Controller
                 'nombre_postes'          => 'nullable|integer|min:1',
                 'date_limite'            => 'nullable|date|after_or_equal:today',
                 'salaire_min'            => 'nullable|integer|min:0',
-                'salaire_max'            => 'nullable|integer|min:0|gte:salaire_min',
+                'salaire_max'            => 'nullable|integer|min:0',
             ]);
+
+            // ✅ Validation manuelle département
+            $department = Department::where('id', $validated['department_id'])->first();
+            if (!$department) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Département introuvable.',
+                    'errors'  => ['department_id' => ['Le département sélectionné est invalide.']],
+                ], 422);
+            }
 
             $job = Job::create([
                 ...$validated,
                 'created_by' => Auth::id(),
-                'statut'     => $validated['statut'] ?? 'brouillon',
             ]);
 
+            $job->load(['department', 'creator']);
+
+            return (new JobResource($job))
+                ->additional(['success' => true, 'message' => 'Offre créée avec succès'])
+                ->response()
+                ->setStatusCode(201);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
-                'success' => true,
-                'message' => 'Offre créée avec succès',
-                'data'    => $job->load(['department', 'creator']),
-            ], 201);
+                'success' => false,
+                'message' => 'Données invalides',
+                'errors'  => $e->errors(),
+            ], 422);
 
         } catch (\Exception $e) {
             Log::error('Erreur création offre: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur serveur lors de la création.',
+                'message' => 'Erreur serveur : ' . $e->getMessage(),
             ], 500);
         }
     }
 
-    /**
-     * Modifier une offre
-     * PUT /api/rh/jobs/{job}
-     */
-    public function update(Request $request, Job $job)
+    public function update(Request $request, Job $job): JsonResponse
     {
-        // ✅ Policy update — seulement le créateur
-        // Remplace l'ancienne absence de vérification
         $this->authorize('update', $job);
 
         try {
             $validated = $request->validate([
                 'titre'                  => 'sometimes|required|string|max:255',
-                'department_id'          => 'sometimes|required|exists:departments,id',
+                'department_id'          => 'sometimes|required|string',
                 'type_contrat'           => 'sometimes|required|in:CDI,CDD,Stage,Alternance,Freelance',
                 'niveau_experience'      => 'sometimes|required|in:junior,confirme,senior',
                 'type_lieu'              => 'sometimes|required|in:remote,hybrid,onsite',
@@ -181,40 +155,33 @@ class JobController extends Controller
                 'nombre_postes'          => 'sometimes|nullable|integer|min:1',
                 'date_limite'            => 'sometimes|nullable|date',
                 'salaire_min'            => 'sometimes|nullable|integer|min:0',
-                'salaire_max'            => 'sometimes|nullable|integer|min:0|gte:salaire_min',
+                'salaire_max'            => 'sometimes|nullable|integer|min:0',
             ]);
 
             $job->update($validated);
+            $job->load(['department', 'creator']);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Offre mise à jour avec succès',
-                'data'    => $job->fresh(),
-            ]);
+            return (new JobResource($job))
+                ->additional(['success' => true, 'message' => 'Offre mise à jour avec succès'])
+                ->response();
 
         } catch (\Exception $e) {
             Log::error('Erreur mise à jour offre: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur serveur lors de la mise à jour.',
+                'message' => 'Erreur serveur : ' . $e->getMessage(),
             ], 500);
         }
     }
 
-    /**
-     * Supprimer une offre
-     * DELETE /api/rh/jobs/{job}
-     */
-    public function destroy(Job $job)
+    public function destroy(Job $job): JsonResponse
     {
-        // ✅ Policy delete — remplace la vérif manuelle
-        // Avant : if ($job->created_by !== Auth::id()) { abort(403) }
         $this->authorize('delete', $job);
 
         if ($job->applications()->count() > 0) {
             return response()->json([
                 'success' => false,
-                'message' => 'Impossible de supprimer : des candidatures sont liées à cette offre.',
+                'message' => 'Impossible de supprimer : des candidatures sont liées.',
             ], 400);
         }
 
@@ -222,7 +189,7 @@ class JobController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Offre supprimée',
+            'message' => 'Offre supprimée avec succès.',
         ]);
     }
 }

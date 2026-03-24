@@ -18,7 +18,8 @@ use App\Services\AuthService;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Auth\Notifications\ResetPassword;
-
+use Laravel\Sanctum\Sanctum;
+use App\Models\PersonalAccessToken;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -29,6 +30,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
         // ── LinkedIn OAuth ──
         Event::listen(function (SocialiteWasCalled $event) {
             $event->extendSocialite('linkedin-openid',
@@ -58,17 +61,24 @@ class AppServiceProvider extends ServiceProvider
         });
 
         // ── Email de vérification personnalisé ──
-        VerifyEmail::toMailUsing(function (object $notifiable, string $url) {
-            return (new MailMessage)
-                ->subject('Vérifiez votre adresse email — TalentFlow')
-                ->greeting('Bonjour ' . $notifiable->name . ' !')
-                ->line('Merci de vous être inscrit sur TalentFlow.')
-                ->line('Cliquez sur le bouton ci-dessous pour vérifier votre adresse email.')
-                ->action('Vérifier mon email', $url)
-                ->line('Ce lien expire dans 60 minutes.')
-                ->line('Si vous n\'avez pas créé de compte, ignorez cet email.')
-                ->salutation('L\'équipe TalentFlow');
-        });
+        // ── Email de vérification personnalisé ──
+VerifyEmail::toMailUsing(function (object $notifiable, string $url) {
+    // 1. On récupère l'URL du frontend (React)
+    $frontendUrl = config('app.frontend_url', 'http://localhost:5173');
+
+    // 2. On transforme l'URL de vérification pour qu'elle passe par le Frontend
+    // Laravel génère une URL signée. On l'envoie comme paramètre à React.
+    $verifyUrl = $frontendUrl . '/verify-email?queryURL=' . urlencode($url);
+
+    return (new MailMessage)
+        ->subject('Vérifiez votre adresse email — TalentFlow')
+        ->greeting('Bonjour ' . $notifiable->name . ' !')
+        ->line('Merci de vous être inscrit sur TalentFlow.')
+        ->line('Cliquez sur le bouton ci-dessous pour vérifier votre adresse email.')
+        ->action('Vérifier mon email', $verifyUrl) // <-- On utilise la nouvelle URL
+        ->line('Ce lien expire dans 60 minutes.')
+        ->salutation('L\'équipe TalentFlow');
+});
 
         ResetPassword::createUrlUsing(function (User $user, string $token) {
             $frontendUrl = config('app.frontend_url', 'http://localhost:5173');

@@ -8,25 +8,23 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\CandidatController;
 use App\Http\Controllers\AdminController;
-use Illuminate\Foundation\Auth\EmailVerificationRequest;
-use Illuminate\Support\Facades\Password;
 use App\Http\Controllers\PasswordResetController;  // ← ajouter l'import
 use App\Http\Controllers\EmailVerificationController;  // ← ajouter l'import
 
 // ── Vérification Email ────────────────────────────────
 Route::get('/email/verify',
     [EmailVerificationController::class, 'notice'])
-    ->middleware('auth:sanctum')
+    ->middleware('auth.mongo')
     ->name('verification.notice');
 
 Route::get('/email/verify/{id}/{hash}',
     [EmailVerificationController::class, 'verify'])
-    ->middleware(['auth:sanctum', 'signed'])
+    ->middleware(['auth.mongo', 'signed'])
     ->name('verification.verify');
 
 Route::post('/email/resend-verification',
     [EmailVerificationController::class, 'resend'])
-    ->middleware(['auth:sanctum', 'throttle:6,1'])
+    ->middleware(['auth.mongo', 'throttle:6,1'])
     ->name('verification.send');
 
 
@@ -55,7 +53,12 @@ Route::middleware('throttle:public')->name('auth.')->group(function () {
     Route::post('/register/manager',  [AuthController::class, 'registerManager']) ->name('register.manager');
     Route::post('/login',             [AuthController::class, 'login'])            ->name('login');
     Route::post('/login/admin',       [AuthController::class, 'loginAdmin'])       ->name('login.admin');
+
+    // ✅ Ajouter ces deux routes
+    Route::post('/login/rh',          [AuthController::class, 'login'])            ->name('login.rh');
+    Route::post('/login/manager',     [AuthController::class, 'login'])            ->name('login.manager');
 });
+
 
 // Offres publiées
 Route::get('/jobs',      [JobController::class, 'publicIndex'])->name('jobs.index');
@@ -70,7 +73,7 @@ Route::get('/departments', [DepartmentController::class, 'index'])->name('depart
    🔐 ROUTES AUTHENTIFIÉES
    ═══════════════════════════════════════════════════════ */
 
-Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
+Route::middleware(['auth.mongo', 'throttle:api'])->group(function () {
 
     Route::get('/user',    fn(Request $r) => $r->user())->name('user.me');
     Route::post('/logout', [AuthController::class, 'logout'])->name('auth.logout');
@@ -133,4 +136,9 @@ Route::fallback(function () {
         'success' => false,
         'message' => 'Route introuvable',
     ], 404);
+});
+
+// routes/api.php
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/email/resend-verification', [EmailVerificationController::class, 'resend']);
 });

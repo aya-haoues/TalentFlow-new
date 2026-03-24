@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Socialite\Facades\Socialite;
+use Illuminate\Http\JsonResponse;
+
 
 class AuthController extends Controller
 {
@@ -118,40 +120,32 @@ class AuthController extends Controller
        LOGIN
        ═══════════════════════════════════════════════════════ */
 
-    public function login(Request $request)
-    {
-        $validator = Validator::make(
-            $request->all(),
-            $this->authService->loginRules(),
-            $this->authService->validationMessages()
-        );
+    
+public function login(Request $request): JsonResponse
+{
+    $request->validate($this->authService->loginRules());
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors'  => $validator->errors()
-            ], 422);
-        }
-
-        // Service retourne success, status, message, data
-        $result = $this->authService->login(
-            $request->email,
-            $request->password
-        );
-
-        if (!$result['success']) {
-            return response()->json([
-                'success' => false,
-                'message' => $result['message'],
-            ], $result['status']);   // 401 ou 403 selon le cas
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => $result['message'],
-            ...$result['data'],      // access_token, token_type, user
-        ], 200);
+    // Détecter le rôle depuis l'URL
+    $role = null;
+    if (str_contains($request->path(), 'login/rh')) {
+        $role = 'rh';
+    } elseif (str_contains($request->path(), 'login/manager')) {
+        $role = 'manager';
     }
+
+    $result = $this->authService->login(
+        $request->email,
+        $request->password,
+        $role
+    );
+
+    return response()->json(
+        $result['data']
+            ? array_merge(['success' => $result['success'], 'message' => $result['message']], $result['data'])
+            : ['success' => $result['success'], 'message' => $result['message']],
+        $result['status']
+    );
+}
 
     public function loginAdmin(Request $request)
     {
@@ -325,15 +319,23 @@ public function handleLinkedInCallback()
        ═══════════════════════════════════════════════════════ */
 
     public function logout(Request $request)
-    {
-        // Révoque uniquement le token courant (pas tous les tokens)
-        if ($request->user()) {
-            $request->user()->currentAccessToken()->delete();
+{
+    // ── Avec MongoTokenAuth — supprimer le token manuellement ──
+    $bearerToken = $request->bearerToken();
+
+    if ($bearerToken) {
+        if (str_contains($bearerToken, '|')) {
+            [, $plainText] = explode('|', $bearerToken, 2);
+        } else {
+            $plainText = $bearerToken;
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Déconnexion réussie',
-        ]);
+        \App\Models\PersonalAccessToken::where('token', hash('sha256', $plainText))->delete();
     }
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Déconnexion réussie.',
+    ]);
+}
 }

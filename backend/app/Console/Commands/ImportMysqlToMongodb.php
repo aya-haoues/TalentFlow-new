@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Application;
-use App\Models\Departement;
+use App\Models\Department;   // ← sans h — nom exact du fichier
 use App\Models\Job;
 use App\Models\User;
 use Illuminate\Console\Command;
@@ -24,7 +24,7 @@ class ImportMysqlToMongodb extends Command
         $deptMap = [];
 
         foreach ($departments as $dept) {
-            $newDept = Departement::updateOrCreate(
+            $newDept = Department::updateOrCreate(
                 ['nom' => $dept->nom],
                 ['description' => $dept->description]
             );
@@ -41,7 +41,7 @@ class ImportMysqlToMongodb extends Command
             $existing = User::where('email', $u->email)->first();
             if ($existing) {
                 $userMap[$u->id] = $existing->id;
-                $this->warn("⚠️ User déjà existant : {$u->email} → ignoré");
+                $this->warn("⚠️ User existant : {$u->email} → ignoré");
                 continue;
             }
 
@@ -65,7 +65,6 @@ class ImportMysqlToMongodb extends Command
                 array_merge($newUser->getAttributes(), ['password' => $u->password]),
                 true
             );
-
             $newUser->save();
             $userMap[$u->id] = $newUser->id;
         }
@@ -77,14 +76,10 @@ class ImportMysqlToMongodb extends Command
         $jobMap = [];
 
         foreach ($jobs as $j) {
-            // ← Vérifier si déjà existant
-            $existing = Job::where('titre', $j->titre)
-                ->where('created_by', $userMap[$j->created_by] ?? null)
-                ->first();
-
+            $existing = Job::where('titre', $j->titre)->first();
             if ($existing) {
                 $jobMap[$j->id] = $existing->id;
-                $this->warn("⚠️ Job déjà existant : {$j->titre} → ignoré");
+                $this->warn("⚠️ Job existant : {$j->titre} → ignoré");
                 continue;
             }
 
@@ -111,61 +106,41 @@ class ImportMysqlToMongodb extends Command
         }
         $this->info("✅ {$jobs->count()} offres migrées");
 
-        // ── 4. Applications ───────────────────────────────────
-$this->info('📋 Migration applications...');
-$applications = DB::connection('mysql')->table('applications')->get();
+        // ── 4. Applications ───────────────────────────
+        $this->info('📋 Migration applications...');
+        $applications = DB::connection('mysql')->table('applications')->get();
+
+        // Remplacer dans ImportMysqlToMongodb.php ligne 114-116 :
 
 foreach ($applications as $a) {
 
-    // Décoder les champs JSON
-    $experiences  = $a->experiences  ? json_decode($a->experiences, true)  : null;
-    $formations   = $a->formations   ? json_decode($a->formations, true)   : null;
-    $skills       = $a->skills       ? json_decode($a->skills, true)       : null;
-    $challenges   = $a->challenges   ? json_decode($a->challenges, true)   : null;
-    $adresse      = $a->adresse      ? json_decode($a->adresse, true)      : null;
+    // ← Adapter selon les vrais noms de colonnes
+    $candidateId = $userMap[$a->candidate_id ?? $a->user_id ?? null] ?? null;
+    $jobId       = $jobMap[$a->job_id ?? $a->offre_id ?? null] ?? null;
+
+    $existing = Application::where('candidate_id', $candidateId)
+        ->where('job_id', $jobId)
+        ->first();
+
+    if ($existing) {
+        $this->warn("⚠️ Application existante → ignorée");
+        continue;
+    }
 
     Application::create([
-        // Relations
-        'job_id'                  => $jobMap[$a->job_id] ?? null,
-        'candidate_id'            => $userMap[$a->user_id] ?? null,
-        // ↑ user_id dans MySQL → candidate_id dans MongoDB
-
-        // Statut
+        'job_id'                  => $jobId,
+        'candidate_id'            => $candidateId,
         'statut'                  => $a->statut,
-        'date_candidature'        => $a->date_candidature,
-        'date_derniere_modification' => $a->date_derniere_modification,
-
-        // CV
         'cv_path'                 => $a->cv_path ?? null,
-        'lettre_motivation'       => $a->lettre_motivation ?? null,
-
-        // Infos personnelles
-        'nom'                     => $a->nom ?? null,
-        'prenom'                  => $a->prenom ?? null,
-        'email'                   => $a->email ?? null,
+        'cv_original_name'        => $a->cv_original_name ?? null,
+        'why_us'                  => $a->why_us ?? null,
         'telephone'               => $a->telephone ?? null,
-        'date_naissance'          => $a->date_naissance ?? null,
-        'genre'                   => $a->genre ?? null,
-        'nationalite'             => $a->nationalite ?? null,
-        'adresse'                 => $adresse,           // ← JSON → array
         'linkedin_url'            => $a->linkedin_url ?? null,
-        'github_url'              => $a->github_url ?? null,
-        'site_web'                => $a->site_web ?? null,
-
-        // Candidature
-        'motivation'              => $a->motivation ?? null,
         'contract_type_preferred' => $a->contract_type_preferred ?? null,
-        'handicap_info'           => $a->handicap_info ?? null,
-        'notes_internes'          => $a->notes_internes ?? null,
-
-        // Arrays JSON → arrays MongoDB natifs ✅
-        'experiences'             => $experiences,
-        'formations'              => $formations,
-        'skills'                  => $skills,
-        'challenges'              => $challenges,
+        'ai_score'                => $a->ai_score ?? null,
     ]);
 }
-$this->info("✅ {$applications->count()} candidatures migrées");
+        $this->info("✅ {$applications->count()} candidatures migrées");
 
         $this->info('');
         $this->info('🎉 Migration terminée avec succès !');
