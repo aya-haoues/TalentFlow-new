@@ -23,7 +23,7 @@ class Application extends Model
 
     protected $connection = 'mongodb';
     protected $collection = 'applications';
-    protected $primaryKey = 'id';
+    protected $primaryKey = '_id';
 
 
     /* ══════════════════════════════════════════════

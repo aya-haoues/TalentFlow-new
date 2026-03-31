@@ -9,7 +9,7 @@ export type ContractType     = 'CDI' | 'CDD' | 'Stage' | 'Alternance' | 'Freelan
 export type ExperienceLevel  = 'junior' | 'confirme' | 'senior';
 export type WorkplaceType    = 'remote' | 'hybrid' | 'onsite';
 export type JobStatus        = 'brouillon' | 'publiee' | 'pausee' | 'archivee';
-export type ApplicationStatus = 'en_attente' | 'en_cours' | 'acceptee' | 'refusee' | 'retiree' | 'annulee';
+export type ApplicationStatus = 'en_attente' | 'en_cours' | 'entretien_technique'| 'closing_rh'|'acceptee' | 'refusee' | 'retiree' | 'annulee';
 export type SkillLevel       = 'debutant' | 'intermediaire' | 'avance' | 'expert';
 export type Gender           = 'homme' | 'femme' | 'autre' | 'prefer_ne_pas_repondre';
 
@@ -87,6 +87,12 @@ export interface Application {
   date_candidature?:       string;        // alias created_at formaté
   created_at:              string;
   updated_at:              string;
+}
+
+export interface TechnicalEvaluationInput { 
+  technical_score:   number;
+  manager_feedback:  string;
+  decision:          'accepted' | 'rejected';
 }
 
 /* ══════════════════════════════════════════════════════════

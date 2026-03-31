@@ -46,7 +46,7 @@ const ROLE_CONFIG: Record<Role, {
     title:        'TalentFlow — Manager',
     subtitle:     'Espace Manager',
     color:        '#00a89c',
-    redirectTo:   '/dashboard/manager',
+    redirectTo:   '/manager/dashboard',
     showSocial:   false,
     registerPath: '/register/manager',
     loginType:    'manager',

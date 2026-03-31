@@ -19,14 +19,16 @@ const { Header } = Layout;
 
 const DASHBOARD_ROUTES: Record<UserRole, string> = {
   candidat: '/candidat/dashboard',
-  rh:       '/rh/dashboard',
-  admin:    '/admin/dashboard',
+  rh: '/rh/dashboard',
+  admin: '/admin/dashboard',
+  manager: ''
 };
 
 const DASHBOARD_LABELS: Record<UserRole, string> = {
   candidat: 'Mon espace',
-  rh:       'Tableau de bord RH',
-  admin:    'Administration',
+  rh: 'Tableau de bord RH',
+  admin: 'Administration',
+  manager: ''
 };
 
 export default function Navbar() {
