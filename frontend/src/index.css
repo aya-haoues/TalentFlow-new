@@ -1,0 +1,51 @@
+:root {
+  --primary: #1677ff;
+  --primary-dark: #0958d9;
+  --success: #52c41a;
+  --danger: #ff4d4f;
+  --warning: #faad14;
+  --gray-100: #fafafa;
+  --gray-200: #f5f5f5;
+  --gray-800: #262626;
+  --gray-900: #000000;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Poppins', 'Segoe UI', sans-serif;
+  color: var(--gray-800);
+  background-color: var(--gray-100);
+  min-height: 100vh;
+}
+
+* {
+  font-family: 'Poppins', 'Segoe UI', sans-serif;
+}
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
